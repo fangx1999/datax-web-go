@@ -231,15 +231,20 @@ func (ct *Controller) TaskUpdateJson(c *gin.Context) {
 	c.Redirect(302, fmt.Sprintf("/tasks/%d", id))
 }
 
-// TaskRunNow 手动触发任务执行
+// TaskRunNow 手动触发任务执行（异步）
 func (ct *Controller) TaskRunNow(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-	_, err := ct.sched.RunTask(c, id)
-	if err != nil {
-		c.String(500, fmt.Sprintf("执行失败: %v", err))
-		return
-	}
-	c.Redirect(302, fmt.Sprintf("/tasks/%d", id))
+
+	// 异步执行任务
+	go func() {
+		_, err := ct.sched.RunTask(c, id)
+		if err != nil {
+			fmt.Printf("任务 %d 执行失败: %v\n", id, err)
+		}
+	}()
+
+	// 直接跳转到任务日志页面
+	c.Redirect(302, "/task-logs")
 }
 
 // TaskDelete 永久删除任务

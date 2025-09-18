@@ -148,16 +148,29 @@ func (b *ConfigBuilder) buildFSReader(req ConfigRequest, columnNames []string) (
 	}
 
 	param := map[string]any{
-		"defaultFS":    conn.DefaultFS,
-		"path":         req.Input.FS.Path,
-		"fileType":     fileType,
-		"hadoopConfig": conn.HadoopConfig,
+		"defaultFS": conn.DefaultFS,
+		"path":      req.Input.FS.Path,
+		"fileType":  fileType,
+	}
+
+	// 只有当hadoopConfig不为空时才添加
+	if conn.HadoopConfig != nil && len(conn.HadoopConfig) > 0 {
+		param["hadoopConfig"] = conn.HadoopConfig
+	}
+
+	// 添加filename字段（如果指定）
+	if req.Input.FS.Filename != nil && *req.Input.FS.Filename != "" {
+		param["fileName"] = *req.Input.FS.Filename
 	}
 
 	// 根据文件类型设置列配置
 	switch fileType {
 	case FileFormatText:
-		param["fieldDelimiter"] = b.getFieldDelimiter(req.Input.FS.FieldDelimiter)
+		delimiter, err := b.getFieldDelimiter(req.Input.FS.FieldDelimiter)
+		if err != nil {
+			return nil, err
+		}
+		param["fieldDelimiter"] = delimiter
 		param["column"] = b.buildTextColumns(req.Input.FS.Indexes, req.Columns)
 	case FileFormatORC, FileFormatParquet:
 		param["column"] = b.buildIndexColumns(req.Input.FS.Indexes, req.Columns)
@@ -209,18 +222,36 @@ func (b *ConfigBuilder) buildFSWriter(req ConfigRequest, columnNames []string) (
 		fileType = FileFormatORC
 	}
 
-	param := map[string]any{
-		"defaultFS":    conn.DefaultFS,
-		"path":         req.Output.FS.Path,
-		"fileType":     fileType,
-		"writeMode":    "append",
-		"hadoopConfig": conn.HadoopConfig,
-		"column":       b.buildOutputColumns(req.Columns),
+	// 设置默认写入模式
+	writeMode := req.Output.FS.WriteMode
+	if writeMode == "" {
+		writeMode = WriteModeNonConflict // 默认为nonConflict
 	}
 
-	if fileType == FileFormatText {
-		param["fieldDelimiter"] = b.getFieldDelimiter(req.Output.FS.FieldDelimiter)
+	param := map[string]any{
+		"defaultFS": conn.DefaultFS,
+		"path":      req.Output.FS.Path,
+		"fileType":  fileType,
+		"writeMode": string(writeMode),
+		"column":    b.buildOutputColumns(req.Columns),
 	}
+
+	// 只有当hadoopConfig不为空时才添加
+	if conn.HadoopConfig != nil && len(conn.HadoopConfig) > 0 {
+		param["hadoopConfig"] = conn.HadoopConfig
+	}
+
+	// 添加filename字段（如果指定）
+	if req.Output.FS.Filename != nil && *req.Output.FS.Filename != "" {
+		param["fileName"] = *req.Output.FS.Filename
+	}
+
+	// 文件系统类型时fieldDelimiter是必填的
+	delimiter, err := b.getFieldDelimiter(req.Output.FS.FieldDelimiter)
+	if err != nil {
+		return nil, err
+	}
+	param["fieldDelimiter"] = delimiter
 
 	return map[string]any{"name": "hdfswriter", "parameter": param}, nil
 }
@@ -277,11 +308,12 @@ func (b *ConfigBuilder) buildOutputColumns(columns []Column) []map[string]string
 }
 
 // getFieldDelimiter 获取字段分隔符
-func (b *ConfigBuilder) getFieldDelimiter(delimiter *string) string {
+// 文件系统类型时fieldDelimiter是必填的
+func (b *ConfigBuilder) getFieldDelimiter(delimiter *string) (string, error) {
 	if delimiter != nil && *delimiter != "" {
-		return *delimiter
+		return *delimiter, nil
 	}
-	return "\\t"
+	return "", errors.New("fieldDelimiter is required for file system")
 }
 
 // MarshalJSON 格式化 JSON

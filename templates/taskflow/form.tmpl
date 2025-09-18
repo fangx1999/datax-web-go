@@ -97,7 +97,8 @@
           <div id="custom-options" class="cron-options" style="display: none;">
             <div class="cron-section">
               <label>CRON表达式</label>
-              <input type="text" id="custom-cron" placeholder="例如: 0 0 1 * * ? *" onchange="updateCronExpression()">
+              <input type="text" id="custom-cron" placeholder="例如: 0 0 1 * * ?" onchange="updateCronExpression()">
+              <div class="cron-hint">格式: 秒 分 时 日 月 周 (6个字段)</div>
             </div>
           </div>
           
@@ -141,7 +142,7 @@ function updateCronExpression() {
   switch(frequency) {
     case 'daily': {
       const time = getTimeValues('daily');
-      cronExpression = `${time.second} ${time.minute} ${time.hour} * * ? *`;
+      cronExpression = `${time.second} ${time.minute} ${time.hour} * * ?`;
       description = `每天 ${formatTime(time.hour, time.minute, time.second)} 执行`;
       break;
     }
@@ -150,7 +151,7 @@ function updateCronExpression() {
       const time = getTimeValues('weekly');
       const day = document.getElementById('weekly-day').value;
       const dayNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-      cronExpression = `${time.second} ${time.minute} ${time.hour} ? * ${day} *`;
+      cronExpression = `${time.second} ${time.minute} ${time.hour} ? * ${day}`;
       description = `每${dayNames[day]} ${formatTime(time.hour, time.minute, time.second)} 执行`;
       break;
     }
@@ -158,7 +159,7 @@ function updateCronExpression() {
     case 'monthly': {
       const time = getTimeValues('monthly');
       const day = document.getElementById('monthly-day').value;
-      cronExpression = `${time.second} ${time.minute} ${time.hour} ${day} * ? *`;
+      cronExpression = `${time.second} ${time.minute} ${time.hour} ${day} * ?`;
       description = `每月${day}日 ${formatTime(time.hour, time.minute, time.second)} 执行`;
       break;
     }
@@ -171,6 +172,40 @@ function updateCronExpression() {
   
   cronInput.value = cronExpression;
   descriptionDiv.textContent = description;
+  
+  // 验证cron表达式
+  validateCronExpression(cronExpression);
+}
+
+function validateCronExpression(expr) {
+  const descriptionDiv = document.getElementById('cron-description');
+  
+  if (!expr || expr.trim() === '') {
+    descriptionDiv.textContent = '请输入cron表达式';
+    descriptionDiv.style.color = '#ff6b6b';
+    return false;
+  }
+  
+  // 检查cron表达式格式（6个字段：秒 分 时 日 月 周）
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length !== 6) {
+    descriptionDiv.textContent = '错误: cron表达式必须是6个字段 (秒 分 时 日 月 周)';
+    descriptionDiv.style.color = '#ff6b6b';
+    return false;
+  }
+  
+  // 基本格式检查
+  const validPattern = /^(\*|([0-5]?\d)(-([0-5]?\d))?(,([0-5]?\d)(-([0-5]?\d))?)*)(\/([0-5]?\d))?$/;
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i] !== '*' && parts[i] !== '?' && !validPattern.test(parts[i])) {
+      descriptionDiv.textContent = '错误: cron表达式格式不正确';
+      descriptionDiv.style.color = '#ff6b6b';
+      return false;
+    }
+  }
+  
+  descriptionDiv.style.color = '#51cf66';
+  return true;
 }
 
 function showCronOptions() {
@@ -234,6 +269,16 @@ document.addEventListener('DOMContentLoaded', function() {
   if (existingCron) {
     parseExistingCron(existingCron);
   }
+  
+  // 表单提交验证
+  document.querySelector('form').addEventListener('submit', function(e) {
+    const cronExpr = document.getElementById('cron').value;
+    if (!validateCronExpression(cronExpr)) {
+      e.preventDefault();
+      alert('请检查cron表达式格式是否正确');
+      return false;
+    }
+  });
   
   // 初始化显示
   showCronOptions();
@@ -392,6 +437,7 @@ document.addEventListener('DOMContentLoaded', function() {
   color: #666;
   font-style: italic;
 }
+
 
 /* 响应式设计 */
 @media (max-width: 768px) {

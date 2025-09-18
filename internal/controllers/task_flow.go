@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"com.duole/datax-web-go/internal/models"
+	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"log"
@@ -141,14 +142,41 @@ func (ct *Controller) TaskFlowFlow(c *gin.Context) {
 	})
 }
 
-// TaskFlowRunNow 手动触发任务流执行
+// TaskFlowRunNow 手动触发任务流执行（异步）
 func (ct *Controller) TaskFlowRunNow(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-	if err := ct.sched.RunTaskFlow(c, id); err != nil {
-		c.String(500, fmt.Sprintf("执行失败: %v", err))
+
+	// 检查任务流是否存在
+	var exists bool
+	err := ct.db.QueryRow("SELECT EXISTS(SELECT 1 FROM task_flows WHERE id=?)", id).Scan(&exists)
+	if err != nil {
+		c.String(500, "查询任务流失败: "+err.Error())
 		return
 	}
-	c.Redirect(302, fmt.Sprintf("/task-flows/%d", id))
+	if !exists {
+		c.String(404, "任务流不存在")
+		return
+	}
+
+	// 检查任务流是否已经在运行
+	if ct.sched.IsTaskFlowRunning(id) {
+		c.String(400, "任务流正在运行中，请稍后再试")
+		return
+	}
+
+	// 异步执行任务流
+	go func() {
+		if err := ct.sched.RunTaskFlow(context.Background(), id); err != nil {
+			log.Printf("Task flow %d execution failed: %v", id, err)
+		}
+	}()
+
+	// 立即返回成功响应
+	c.JSON(200, gin.H{
+		"message":  "任务流已开始执行",
+		"flow_id":  id,
+		"redirect": fmt.Sprintf("/task-flows/%d", id),
+	})
 }
 
 // TaskFlowToggle 切换任务流的启用状态
@@ -203,7 +231,11 @@ func (ct *Controller) TaskFlowUpdate(c *gin.Context) {
 	if currentCronExpr != cronExpr {
 		if err := ct.sched.ReloadTaskFlow(id); err != nil {
 			log.Printf("Failed to reload task flow %d in scheduler: %v", id, err)
+			// 向用户显示错误信息
+			c.String(500, fmt.Sprintf("更新失败: cron表达式无效 - %v", err))
+			return
 		}
+		log.Printf("Successfully reloaded task flow %d with new cron expression: %s", id, cronExpr)
 	}
 
 	c.Redirect(302, "/task-flows")

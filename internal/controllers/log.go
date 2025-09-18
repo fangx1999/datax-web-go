@@ -28,9 +28,7 @@ func (lc *LogController) GetTaskLogs(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	status := c.Query("status")
 	taskName := c.Query("task_name")
-	executionType := c.Query("execution_type")       // scheduled, manual
-	executionContext := c.Query("execution_context") // standalone, flow_step
-	flowExecutionID := c.Query("flow_execution_id")
+	executionType := c.Query("execution_type") // scheduled, manual
 	dateFrom := c.Query("date_from")
 	dateTo := c.Query("date_to")
 
@@ -51,16 +49,6 @@ func (lc *LogController) GetTaskLogs(c *gin.Context) {
 	if executionType != "" {
 		whereClause += " AND tl.execution_type = ?"
 		args = append(args, executionType)
-	}
-
-	if executionContext != "" {
-		whereClause += " AND tl.execution_context = ?"
-		args = append(args, executionContext)
-	}
-
-	if flowExecutionID != "" {
-		whereClause += " AND tl.flow_execution_id = ?"
-		args = append(args, flowExecutionID)
 	}
 
 	if dateFrom != "" {
@@ -96,7 +84,7 @@ func (lc *LogController) GetTaskLogs(c *gin.Context) {
 
 	// 查询任务执行日志列表
 	query := `
-		SELECT tl.id, tl.task_id, t.name as task_name, tl.execution_context,
+		SELECT tl.id, tl.task_id, t.name as task_name, 
 		       tl.flow_execution_id, tl.step_id, tl.step_order,
 		       tl.status, tl.execution_type, tl.start_time, tl.end_time, tl.log, tl.created_at
 		FROM task_logs tl
@@ -123,7 +111,7 @@ func (lc *LogController) GetTaskLogs(c *gin.Context) {
 		var endTime sql.NullTime
 		var flowExecutionID, stepID, stepOrder sql.NullInt64
 
-		err := rows.Scan(&log.ID, &log.TaskID, &log.TaskName, &log.ExecutionContext,
+		err := rows.Scan(&log.ID, &log.TaskID, &log.TaskName,
 			&flowExecutionID, &stepID, &stepOrder, &log.Status, &log.ExecutionType,
 			&log.StartTime, &endTime, &log.LogContent, &log.CreatedAt)
 		if err != nil {
@@ -175,7 +163,7 @@ func (lc *LogController) GetTaskLogDetail(c *gin.Context) {
 
 	// 查询任务执行详情
 	query := `
-		SELECT tl.id, tl.task_id, t.name as task_name, tl.execution_context,
+		SELECT tl.id, tl.task_id, t.name as task_name, 
 		       tl.flow_execution_id, tl.step_id, tl.step_order,
 		       tl.status, tl.execution_type, tl.start_time, tl.end_time, tl.log, tl.created_at
 		FROM task_logs tl
@@ -188,7 +176,7 @@ func (lc *LogController) GetTaskLogDetail(c *gin.Context) {
 	var flowExecutionID, stepID, stepOrder sql.NullInt64
 
 	err = lc.db.QueryRow(query, logID).Scan(
-		&log.ID, &log.TaskID, &log.TaskName, &log.ExecutionContext,
+		&log.ID, &log.TaskID, &log.TaskName,
 		&flowExecutionID, &stepID, &stepOrder, &log.Status, &log.ExecutionType,
 		&log.StartTime, &endTime, &log.LogContent, &log.CreatedAt)
 	if err != nil {
@@ -393,12 +381,12 @@ func (lc *LogController) GetFlowLogDetail(c *gin.Context) {
 
 	// 查询步骤日志（从统一的task_logs表查询）
 	stepsQuery := `
-		SELECT tl.id, tl.task_id, t.name as task_name, tl.execution_context,
+		SELECT tl.id, tl.task_id, t.name as task_name, 
 		       tl.flow_execution_id, tl.step_id, tl.step_order,
 		       tl.status, tl.execution_type, tl.start_time, tl.end_time, tl.log, tl.created_at
 		FROM task_logs tl
 		LEFT JOIN tasks t ON tl.task_id = t.id
-		WHERE tl.flow_execution_id = ? AND tl.execution_context = 'flow_step'
+		WHERE tl.flow_execution_id = ?
 		ORDER BY tl.step_order
 	`
 
@@ -418,7 +406,7 @@ func (lc *LogController) GetFlowLogDetail(c *gin.Context) {
 		var endTime sql.NullTime
 		var flowExecutionID, stepID, stepOrder sql.NullInt64
 
-		err := rows.Scan(&step.ID, &step.TaskID, &step.TaskName, &step.ExecutionContext,
+		err := rows.Scan(&step.ID, &step.TaskID, &step.TaskName,
 			&flowExecutionID, &stepID, &stepOrder, &step.Status, &step.ExecutionType,
 			&step.StartTime, &endTime, &step.LogContent, &step.CreatedAt)
 		if err != nil {

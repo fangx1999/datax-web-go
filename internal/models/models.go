@@ -96,15 +96,11 @@ type TaskFlow struct {
 
 // TaskFlowStep 表示任务流中的步骤
 type TaskFlowStep struct {
-	ID             int       `json:"id"`
-	StepOrder      int       `json:"step_order"`
-	TimeoutMinutes *int      `json:"timeout_minutes,omitempty"`
-	TaskName       string    `json:"task_name"`
-	TaskID         int       `json:"task_id"`
-	CreatedBy      *int      `json:"created_by,omitempty"`
-	UpdatedBy      *int      `json:"updated_by,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             int    `json:"id"`
+	StepOrder      int    `json:"step_order"`
+	TimeoutMinutes *int   `json:"timeout_minutes,omitempty"`
+	TaskName       string `json:"task_name"`
+	TaskID         int    `json:"task_id"`
 }
 
 // ========== Log Models ==========
@@ -124,21 +120,20 @@ type FlowExecutionLog struct {
 
 // TaskExecutionLog 表示统一的任务执行日志（支持独立任务和任务流步骤）
 type TaskExecutionLog struct {
-	ID               int        `json:"id"`
-	TaskID           int        `json:"task_id"`
-	TaskName         string     `json:"task_name"`
-	ExecutionContext string     `json:"execution_context"` // 'standalone' or 'flow_step'
-	FlowExecutionID  *int       `json:"flow_execution_id,omitempty"`
-	StepID           *int       `json:"step_id,omitempty"`
-	StepOrder        *int       `json:"step_order,omitempty"`
-	Status           string     `json:"status"`
-	ExecutionType    string     `json:"execution_type"` // scheduled, manual
-	StartTime        time.Time  `json:"start_time"`
-	EndTime          *time.Time `json:"end_time,omitempty"`
-	Duration         string     `json:"duration,omitempty"`
-	LogContent       string     `json:"log_content"`
-	ErrorMessage     string     `json:"error_message,omitempty"`
-	CreatedAt        time.Time  `json:"created_at"`
+	ID              int        `json:"id"`
+	TaskID          int        `json:"task_id"`
+	TaskName        string     `json:"task_name"`
+	FlowExecutionID *int       `json:"flow_execution_id,omitempty"`
+	StepID          *int       `json:"step_id,omitempty"`
+	StepOrder       *int       `json:"step_order,omitempty"`
+	Status          string     `json:"status"`
+	ExecutionType   string     `json:"execution_type"` // scheduled, manual
+	StartTime       time.Time  `json:"start_time"`
+	EndTime         *time.Time `json:"end_time,omitempty"`
+	Duration        string     `json:"duration,omitempty"`
+	LogContent      string     `json:"log_content"`
+	ErrorMessage    string     `json:"error_message,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 // FlowLogListResponse 表示流程日志列表响应

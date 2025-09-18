@@ -9,9 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"sync"
 	"time"
+
+	"com.duole/datax-web-go/internal/models"
+	"com.duole/datax-web-go/internal/util"
 )
 
 // runningTask 表示当前正在执行的 DataX 任务
@@ -97,8 +99,16 @@ func (s *Scheduler) LoadAndStart() {
 		var expr string
 		if err := rows.Scan(&id, &expr); err == nil {
 			flowID := id
+
+			// 验证cron表达式格式
+			if err := ValidateCronExpression(expr); err != nil {
+				log.Printf("scheduler: invalid cron expression for task flow %d: %v", flowID, err)
+				continue
+			}
+
 			entryID, err := s.cron.AddFunc(expr, func() {
-				if err := s.RunTaskFlow(context.Background(), flowID); err != nil {
+				ctx := context.WithValue(context.Background(), "execution_type", "scheduled")
+				if err := s.RunTaskFlow(ctx, flowID); err != nil {
 					log.Printf("scheduler: task flow %d error: %v", flowID, err)
 				}
 			})
@@ -109,6 +119,7 @@ func (s *Scheduler) LoadAndStart() {
 				s.cronMu.Lock()
 				s.cronEntries[flowID] = entryID
 				s.cronMu.Unlock()
+				log.Printf("scheduler: scheduled task flow %d with cron expression: %s", flowID, expr)
 			}
 		}
 	}
@@ -141,8 +152,14 @@ func (s *Scheduler) ReloadTaskFlow(flowID int) error {
 
 	// 只有在启用且有有效 cron 表达式时才调度
 	if enabled && cronExpr != "" {
+		// 验证cron表达式格式
+		if err := ValidateCronExpression(cronExpr); err != nil {
+			return fmt.Errorf("invalid cron expression for task flow %d: %v", flowID, err)
+		}
+
 		entryID, err := s.cron.AddFunc(cronExpr, func() {
-			if err := s.RunTaskFlow(context.Background(), flowID); err != nil {
+			ctx := context.WithValue(context.Background(), "execution_type", "scheduled")
+			if err := s.RunTaskFlow(ctx, flowID); err != nil {
 				log.Printf("scheduler: task flow %d error: %v", flowID, err)
 			}
 		})
@@ -156,6 +173,10 @@ func (s *Scheduler) ReloadTaskFlow(flowID int) error {
 		s.cronMu.Unlock()
 
 		log.Printf("scheduler: reloaded task flow %d with cron expression: %s", flowID, cronExpr)
+	} else if enabled && cronExpr == "" {
+		log.Printf("scheduler: task flow %d is enabled but has empty cron expression", flowID)
+	} else if !enabled {
+		log.Printf("scheduler: task flow %d is disabled, not scheduling", flowID)
 	}
 
 	return nil
@@ -185,59 +206,90 @@ func (s *Scheduler) RemoveTaskFlowFromCron(flowID int) error {
 // 日志被捕获并存储在 task_logs 中。完成后，状态更新为 'success' 或 'failed'。
 // 当通过 KillTask 取消上下文时，底层命令将被终止，状态标记为 'killed'。
 func (s *Scheduler) RunTask(ctx context.Context, taskID int) (string, error) {
-	return s.RunTaskWithDate(ctx, taskID, time.Time{})
+	return s.runTask(ctx, taskID, time.Time{}, nil, nil, nil, "manual")
 }
 
-// RunTaskWithDate 执行任务并支持指定日期占位符替换日期
-// 如果 executionDate 为零值，则使用默认的昨天日期
-func (s *Scheduler) RunTaskWithDate(ctx context.Context, taskID int, executionDate time.Time) (string, error) {
+// RunTaskWithContext 执行任务并支持任务流上下文信息
+func (s *Scheduler) RunTaskWithContext(ctx context.Context, taskID int, flowExecutionID, stepID, stepOrder *int, executionType string) (string, error) {
+	return s.runTask(ctx, taskID, time.Time{}, flowExecutionID, stepID, stepOrder, executionType)
+}
+
+// runTask 内部任务执行方法
+func (s *Scheduler) runTask(ctx context.Context, taskID int, executionDate time.Time, flowExecutionID, stepID, stepOrder *int, executionType string) (string, error) {
+	// 原子性地检查和设置运行状态
+	s.tasksMu.Lock()
+	if _, exists := s.tasks[taskID]; exists {
+		s.tasksMu.Unlock()
+		errorMsg := fmt.Sprintf("任务 %d 正在运行中", taskID)
+		return errorMsg, fmt.Errorf("task %d already running", taskID)
+	}
+
+	// 使用带取消功能的上下文以支持终止
+	jobCtx, cancel := context.WithCancel(ctx)
+	// 先设置一个占位符，防止并发执行
+	s.tasks[taskID] = &runningTask{cancel: cancel, cmd: nil}
+	s.tasksMu.Unlock()
+
+	// 定义清理函数
+	cleanup := func() {
+		s.tasksMu.Lock()
+		delete(s.tasks, taskID)
+		s.tasksMu.Unlock()
+		cancel()
+	}
+
 	// 获取详细信息：JSON 配置、源、目标
 	var jsonCfg, name string
 	var srcID, tgtID int
 	err := s.db.QueryRow(`SELECT name, COALESCE(json_config,''), source_id, target_id FROM tasks WHERE id=?`, taskID).
 		Scan(&name, &jsonCfg, &srcID, &tgtID)
 	if err != nil {
+		cleanup()
 		errorMsg := fmt.Sprintf("查询任务失败: %v", err)
 		return errorMsg, err
 	}
 
 	// 如果配置为空则构建配置
 	if jsonCfg == "" {
+		cleanup()
 		errorMsg := "任务配置为空，无法执行"
-		s.appendTaskLog(taskID, time.Now(), time.Now(), "failed", errorMsg)
+		s.appendTaskLog(taskID, time.Now(), time.Now(), "failed", errorMsg, flowExecutionID, stepID, stepOrder, executionType)
 		return errorMsg, fmt.Errorf("task %d has empty configuration", taskID)
 	}
 
 	// 处理日期占位符
 	var processedConfig string
 	if executionDate.IsZero() {
-		processedConfig = processDatePlaceholders(jsonCfg)
+		processedConfig = util.ProcessDatePlaceholders(jsonCfg)
 	} else {
-		processedConfig = processDatePlaceholders(jsonCfg, executionDate)
+		processedConfig = util.ProcessDatePlaceholders(jsonCfg, executionDate)
+	}
+
+	// 验证并创建路径
+	pathValidator := util.NewPathValidator()
+	if err := pathValidator.ValidateDataXConfigPaths(processedConfig); err != nil {
+		cleanup()
+		errorMsg := fmt.Sprintf("路径验证失败: %v", err)
+		s.appendTaskLog(taskID, time.Now(), time.Now(), "failed", errorMsg, flowExecutionID, stepID, stepOrder, executionType)
+		return errorMsg, err
 	}
 
 	// 准备命令
 	tmp := filepath.Join(s.tempDir, fmt.Sprintf("job_%d_%d.json", taskID, time.Now().UnixNano()))
 	if err := os.WriteFile(tmp, []byte(processedConfig), 0644); err != nil {
+		cleanup()
+		os.Remove(tmp) // 清理临时文件
 		errorMsg := fmt.Sprintf("写入配置文件失败: %v", err)
-		s.appendTaskLog(taskID, time.Now(), time.Now(), "failed", errorMsg)
+		s.appendTaskLog(taskID, time.Now(), time.Now(), "failed", errorMsg, flowExecutionID, stepID, stepOrder, executionType)
 		return errorMsg, err
 	}
 
-	// 使用带取消功能的上下文以支持终止
-	jobCtx, cancel := context.WithCancel(ctx)
+	// 创建命令
 	cmd := exec.CommandContext(jobCtx, "python", filepath.Join(s.dataxHome, "bin", "datax.py"), tmp)
 
-	// 原子性地检查和设置运行状态
+	// 更新运行状态中的命令
 	s.tasksMu.Lock()
-	if _, exists := s.tasks[taskID]; exists {
-		s.tasksMu.Unlock()
-		os.Remove(tmp) // 清理临时文件
-
-		errorMsg := fmt.Sprintf("任务 %d 正在运行中", taskID)
-		return errorMsg, fmt.Errorf("task %d already running", taskID)
-	}
-	s.tasks[taskID] = &runningTask{cancel: cancel, cmd: cmd}
+	s.tasks[taskID].cmd = cmd
 	s.tasksMu.Unlock()
 
 	start := time.Now()
@@ -261,7 +313,7 @@ func (s *Scheduler) RunTaskWithDate(ctx context.Context, taskID int, executionDa
 	}
 
 	// 保存日志
-	s.appendTaskLog(taskID, start, end, status, string(output))
+	s.appendTaskLog(taskID, start, end, status, string(output), flowExecutionID, stepID, stepOrder, executionType)
 
 	// 清理临时文件
 	os.Remove(tmp)
@@ -288,48 +340,60 @@ func (s *Scheduler) KillTask(taskID int) error {
 
 // RunTaskFlow 立即执行任务流
 func (s *Scheduler) RunTaskFlow(ctx context.Context, flowID int) error {
-	// 创建执行记录
-	result, err := s.db.Exec(`
-		INSERT INTO task_flow_executions (flow_id, status, start_time)
-		VALUES (?, 'running', NOW())
-	`, flowID)
-	if err != nil {
-		return fmt.Errorf("failed to create task flow execution record: %v", err)
-	}
-	execID64, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get execution ID: %v", err)
-	}
-	execID := int(execID64)
-
-	// 使用带取消功能的上下文以支持终止
-	flowCtx, cancel := context.WithCancel(ctx)
-
 	// 原子性地检查和设置运行状态
 	s.flowsMu.Lock()
 	if _, exists := s.flows[flowID]; exists {
 		s.flowsMu.Unlock()
-		cancel() // 清理上下文
 		return fmt.Errorf("task flow %d already running", flowID)
 	}
+
+	// 使用带取消功能的上下文以支持终止
+	flowCtx, cancel := context.WithCancel(ctx)
 	s.flows[flowID] = &runningTaskFlow{cancel: cancel, flowID: flowID}
 	s.flowsMu.Unlock()
 
+	// 定义清理函数
+	cleanup := func() {
+		s.flowsMu.Lock()
+		delete(s.flows, flowID)
+		s.flowsMu.Unlock()
+		cancel()
+	}
+
+	// 确定执行类型（手动或定时）
+	executionType := "manual"
+	if ctx.Value("execution_type") != nil {
+		if et, ok := ctx.Value("execution_type").(string); ok {
+			executionType = et
+		}
+	}
+
+	// 创建执行记录
+	result, err := s.db.Exec(`
+		INSERT INTO task_flow_executions (flow_id, status, execution_type, start_time)
+		VALUES (?, 'running', ?, NOW())
+	`, flowID, executionType)
+	if err != nil {
+		cleanup()
+		return fmt.Errorf("failed to create task flow execution record: %v", err)
+	}
+	execID64, err := result.LastInsertId()
+	if err != nil {
+		cleanup()
+		return fmt.Errorf("failed to get execution ID: %v", err)
+	}
+	execID := int(execID64)
+
 	status := "success"
-	var logContent string
 
 	// 执行任务流步骤
-	err = s.executeFlowSteps(flowCtx, flowID, execID)
+	err = s.executeFlowSteps(flowCtx, flowID, execID, executionType)
 	if err != nil {
 		if flowCtx.Err() == context.Canceled {
 			status = "killed"
-			logContent = "Task flow was killed by user"
 		} else {
 			status = "failed"
-			logContent = fmt.Sprintf("Task flow execution failed: %v", err)
 		}
-	} else {
-		logContent = "Task flow completed successfully"
 	}
 
 	end := time.Now()
@@ -342,9 +406,9 @@ func (s *Scheduler) RunTaskFlow(ctx context.Context, flowID int) error {
 	// 更新执行记录
 	_, updateErr := s.db.Exec(`
 		UPDATE task_flow_executions 
-		SET status=?, end_time=?, log=?
+		SET status=?, end_time=?
 		WHERE id=?
-	`, status, end, logContent, execID)
+	`, status, end, execID)
 	if updateErr != nil {
 		log.Printf("scheduler: failed to update task flow execution final status: %v", updateErr)
 	}
@@ -369,20 +433,11 @@ func (s *Scheduler) KillTaskFlow(flowID int) error {
 
 // ========== 任务流步骤执行 ==========
 
-// StepInfo 表示任务流步骤
-type StepInfo struct {
-	ID             int
-	TaskID         int
-	TimeoutMinutes *int
-	TaskName       string
-	JSONConfig     string
-}
-
 // executeFlowSteps 执行任务流中的所有步骤
-func (s *Scheduler) executeFlowSteps(ctx context.Context, flowID, execID int) error {
+func (s *Scheduler) executeFlowSteps(ctx context.Context, flowID, execID int, executionType string) error {
 	// 按 step_order 获取任务流步骤
 	rows, err := s.db.Query(`
-		SELECT s.id, s.task_id, s.timeout_minutes, t.name, t.json_config
+		SELECT s.id, s.task_id, s.timeout_minutes, s.step_order, t.name
 		FROM task_flow_steps s
 		JOIN tasks t ON s.task_id = t.id
 		WHERE s.flow_id = ?
@@ -393,32 +448,20 @@ func (s *Scheduler) executeFlowSteps(ctx context.Context, flowID, execID int) er
 	}
 	defer rows.Close()
 
-	var steps []StepInfo
+	var steps []models.TaskFlowStep
 
 	for rows.Next() {
-		var step StepInfo
-		rows.Scan(&step.ID, &step.TaskID, &step.TimeoutMinutes, &step.TaskName, &step.JSONConfig)
+		var step models.TaskFlowStep
+		var stepOrder int
+		rows.Scan(&step.ID, &step.TaskID, &step.TimeoutMinutes, &stepOrder, &step.TaskName)
+		step.StepOrder = stepOrder
 		steps = append(steps, step)
 	}
 
 	// 按顺序执行所有步骤
 	for i, step := range steps {
-		// 创建步骤执行记录
-		result, err := s.db.Exec(`
-			INSERT INTO task_flow_step_executions (execution_id, step_id, task_id, status)
-			VALUES (?, ?, ?, ?)
-		`, execID, step.ID, step.TaskID, "pending")
-		if err != nil {
-			return fmt.Errorf("failed to create step execution record for step %d: %v", i+1, err)
-		}
-		stepExecID64, err := result.LastInsertId()
-		if err != nil {
-			return fmt.Errorf("failed to get step execution ID for step %d: %v", i+1, err)
-		}
-		stepExecID := int(stepExecID64)
-
 		// 执行步骤
-		stepSuccess, err := s.executeStep(ctx, step, stepExecID)
+		stepSuccess, err := s.executeStep(ctx, step, flowID, execID, executionType)
 		if err != nil {
 			return fmt.Errorf("step %d (%s) failed: %v", i+1, step.TaskName, err)
 		}
@@ -431,14 +474,7 @@ func (s *Scheduler) executeFlowSteps(ctx context.Context, flowID, execID int) er
 }
 
 // executeStep 执行单个步骤
-func (s *Scheduler) executeStep(ctx context.Context, step StepInfo, stepExecID int) (bool, error) {
-	// 将步骤状态更新为运行中
-	_, err := s.db.Exec("UPDATE task_flow_step_executions SET status='running', start_time=NOW() WHERE id=?", stepExecID)
-	if err != nil {
-		log.Printf("scheduler: failed to update step execution status to running: %v", err)
-		// 继续执行，不因为状态更新失败而停止
-	}
-
+func (s *Scheduler) executeStep(ctx context.Context, step models.TaskFlowStep, flowID, execID int, executionType string) (bool, error) {
 	// 如果指定了超时时间则创建带超时的上下文
 	stepCtx := ctx
 	var cancel context.CancelFunc
@@ -447,64 +483,59 @@ func (s *Scheduler) executeStep(ctx context.Context, step StepInfo, stepExecID i
 		defer cancel()
 	}
 
-	// 使用任务执行方法执行任务
-	output, err := s.RunTask(stepCtx, step.TaskID)
+	// 直接复用 RunTaskWithContext 方法执行任务
+	_, err := s.RunTaskWithContext(stepCtx, step.TaskID, &execID, &step.ID, &step.StepOrder, executionType)
 
 	// 确定成功状态
 	success := err == nil
-	status := "success"
-
 	if err != nil {
 		if stepCtx.Err() == context.Canceled {
-			status = "killed"
+			log.Printf("scheduler: step %d (%s) was killed", step.ID, step.TaskName)
 		} else {
-			status = "failed"
+			log.Printf("scheduler: step %d (%s) failed: %v", step.ID, step.TaskName, err)
 		}
-	}
-
-	// 更新步骤执行记录，直接使用返回的输出
-	_, updateErr := s.db.Exec(`
-		UPDATE task_flow_step_executions 
-		SET status=?, end_time=NOW(), log=?
-		WHERE id=?
-	`, status, output, stepExecID)
-	if updateErr != nil {
-		log.Printf("scheduler: failed to update step execution final status: %v", updateErr)
+	} else {
+		log.Printf("scheduler: step %d (%s) completed successfully", step.ID, step.TaskName)
 	}
 
 	return success, err
 }
 
+// ========== 状态查询方法 ==========
+
+// IsTaskFlowRunning 检查任务流是否正在运行
+func (s *Scheduler) IsTaskFlowRunning(flowID int) bool {
+	s.flowsMu.RLock()
+	defer s.flowsMu.RUnlock()
+	_, exists := s.flows[flowID]
+	return exists
+}
+
 // ========== 辅助方法 ==========
 
-// processDatePlaceholders 处理配置中的日期占位符
-// 默认替换为执行日期前一天，但支持传入自定义日期
-func processDatePlaceholders(config string, executionDate ...time.Time) string {
-	var targetDate time.Time
-	if len(executionDate) > 0 {
-		targetDate = executionDate[0]
-	} else {
-		// 默认使用执行日期前一天
-		targetDate = time.Now().AddDate(0, 0, -1)
+// ValidateCronExpression 验证cron表达式格式
+func ValidateCronExpression(expr string) error {
+	if expr == "" {
+		return fmt.Errorf("cron expression cannot be empty")
 	}
 
-	// 支持的日期占位符格式
-	placeholders := map[string]string{
-		"${yyyy-mm-dd}": targetDate.Format("2006-01-02"),
-		"${yyyy_mm_dd}": targetDate.Format("2006_01_02"),
+	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	_, err := parser.Parse(expr)
+	if err != nil {
+		return fmt.Errorf("invalid cron expression '%s': %v", expr, err)
 	}
 
-	result := config
-	for placeholder, value := range placeholders {
-		result = regexp.MustCompile(regexp.QuoteMeta(placeholder)).ReplaceAllString(result, value)
-	}
-
-	return result
+	return nil
 }
 
 // appendTaskLog 为任务插入日志条目
-func (s *Scheduler) appendTaskLog(taskID int, start, end time.Time, status, text string) {
-	_, err := s.db.Exec("INSERT INTO task_logs(task_id,start_time,end_time,status,log) VALUES(?,?,?,?,?)", taskID, start, end, status, text)
+func (s *Scheduler) appendTaskLog(taskID int, start, end time.Time, status, text string, flowExecutionID, stepID, stepOrder *int, executionType string) {
+	_, err := s.db.Exec(`
+		INSERT INTO task_logs(
+			task_id, flow_execution_id, step_id, step_order, 
+			execution_type, start_time, end_time, status, log
+		) VALUES(?,?,?,?,?,?,?,?,?)
+	`, taskID, flowExecutionID, stepID, stepOrder, executionType, start, end, status, text)
 	if err != nil {
 		log.Printf("scheduler: failed to append task log for task %d: %v", taskID, err)
 	}

@@ -66,8 +66,8 @@
                             <label for="inTable">数据表名（支持日期占位符）</label>
                             <div class="row">
                                 <input id="inTable" placeholder="table_${yyyy-mm-dd}" style="flex: 1;">
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholder('${yyyy-mm-dd}')">日期</button>
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholder('${yyyy_mm_dd}')">下划线</button>
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inTable', '\${yyyy-mm-dd}')">日期</button>
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inTable', '\${yyyy_mm_dd}')">下划线</button>
                             </div>
                             <small class="help">支持日期占位符，执行时自动替换为当前日期</small>
                         </div>
@@ -109,16 +109,25 @@
                             <label for="inPath">数据文件路径（支持日期占位符）</label>
                             <div class="row">
                                 <input id="inPath" placeholder="/data/ods/orders/dt=${yyyy-mm-dd}" style="flex: 1;">
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholder('${yyyy-mm-dd}')">日期</button>
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholder('${yyyy_mm_dd}')">下划线</button>
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inPath', '\${yyyy-mm-dd}')">日期</button>
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inPath', '\${yyyy_mm_dd}')">下划线</button>
                             </div>
                             <small class="help">完整的存储路径，支持日期占位符</small>
                         </div>
+                        <div class="form-group">
+                            <label for="inFilename">输入文件名（可选，支持日期占位符）</label>
+                            <div class="row">
+                                <input id="inFilename" placeholder="orders_${yyyy-mm-dd}.orc" style="flex: 1;">
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inFilename', '\${yyyy-mm-dd}')">日期</button>
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inFilename', '\${yyyy_mm_dd}')">下划线</button>
+                            </div>
+                            <small class="help">指定输入文件名，留空则读取路径下所有文件。支持日期占位符</small>
+                        </div>
 
                         <div id="inDelimiterBox" style="display:none;" class="form-group">
-                            <label for="inDelimiter">文本分隔符</label>
-                            <input id="inDelimiter" value="," placeholder="输入分隔符，如逗号(,)、制表符(\t)等">
-                            <small class="help">仅当文件类型为 Text 时有效，常用分隔符：逗号(,)、制表符(\t)</small>
+                            <label for="inDelimiter">文本分隔符 <span style="color: red;">*</span></label>
+                            <input id="inDelimiter" value="," placeholder="输入分隔符，如逗号(,)、制表符(\t)等" required>
+                            <small class="help">文件系统输入时必填，常用分隔符：逗号(,)、制表符(\t)</small>
                         </div>
 
                         <div id="inIdxBox" class="form-group">
@@ -161,8 +170,8 @@
                             <label for="outTable">目标表名（支持日期占位符）</label>
                             <div class="row">
                                 <input id="outTable" placeholder="dw_orders_${yyyy-mm-dd}" style="flex: 1;">
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholder('${yyyy-mm-dd}')">日期</button>
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholder('${yyyy_mm_dd}')">下划线</button>
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outTable', '\${yyyy-mm-dd}')">日期</button>
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outTable', '\${yyyy_mm_dd}')">下划线</button>
                             </div>
                             <small class="help">数据将写入此表，支持日期占位符</small>
                         </div>
@@ -191,16 +200,34 @@
                             <label for="outPath">输出文件路径（支持日期占位符）</label>
                             <div class="row">
                                 <input id="outPath" placeholder="/export/orders/dt=${yyyy-mm-dd}" style="flex: 1;">
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholder('${yyyy-mm-dd}')">日期</button>
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholder('${yyyy_mm_dd}')">下划线</button>
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outPath', '\${yyyy-mm-dd}')">日期</button>
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outPath', '\${yyyy_mm_dd}')">下划线</button>
                             </div>
                             <small class="help">完整的存储路径，支持日期占位符</small>
                         </div>
+                        <div class="form-group">
+                            <label for="outFilename">输出文件名（可选，支持日期占位符）</label>
+                            <div class="row">
+                                <input id="outFilename" placeholder="orders_${yyyy-mm-dd}.orc" style="flex: 1;">
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outFilename', '\${yyyy-mm-dd}')">日期</button>
+                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outFilename', '\${yyyy_mm_dd}')">下划线</button>
+                            </div>
+                            <small class="help">指定输出文件名，留空则使用默认命名。支持日期占位符</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="outWriteMode">写入模式</label>
+                            <select id="outWriteMode">
+                                <option value="nonConflict">nonConflict - 文件存在时报错（默认）</option>
+                                <option value="append">append - 直接追加，不做任何处理</option>
+                                <option value="truncate">truncate - 文件存在时先删除后写入</option>
+                            </select>
+                            <small class="help">选择文件写入模式，控制文件冲突时的处理方式</small>
+                        </div>
 
                         <div id="outDelimiterBox" style="display:none;" class="form-group">
-                            <label for="outDelimiter">文本分隔符</label>
-                            <input id="outDelimiter" value="\\t" placeholder="输入分隔符，如逗号(,)、制表符(\t)等">
-                            <small class="help">仅当文件类型为 Text 时有效，默认为制表符(\t)，可根据需要修改</small>
+                            <label for="outDelimiter">文本分隔符 <span style="color: red;">*</span></label>
+                            <input id="outDelimiter" value="\\t" placeholder="输入分隔符，如逗号(,)、制表符(\t)等" required>
+                            <small class="help">文件系统输出时必填，默认为制表符(\t)，可根据需要修改</small>
                         </div>
                     </div>
                 </div>
@@ -228,7 +255,7 @@
             <div class="section-title">预览与编辑 DataX 配置</div>
             <div class="form-group">
                 <div class="row">
-                    <button class="btn primary" type="button" onclick="generatePreview()">生成/刷新预览</button>
+                    <button id="btnPreview" class="btn primary" type="button" onclick="generatePreview()">生成/刷新预览</button>
                     <button class="btn" type="button" onclick="formatJSON()">格式化 JSON</button>
                     <button class="btn" type="button" onclick="validateJSON()">校验配置</button>
                     <span id="pvStatus" class="help"></span>
@@ -246,17 +273,9 @@
 </div>
 
 <script>
-// 插入占位符
-function insertPlaceholder(token) {
-    // 尝试找到当前焦点的输入框
-    let input = document.activeElement;
-    
-    // 如果没有焦点元素或不是输入框，尝试找到最近的输入框
-    if (!input || (input.tagName !== 'INPUT' && input.tagName !== 'TEXTAREA')) {
-        // 查找包含占位符的输入框
-        input = document.querySelector('input[placeholder*="yyyy"], input[placeholder*="table"], input[placeholder*="path"]');
-    }
-    
+// 插入占位符到指定输入框
+function insertPlaceholderTo(inputId, token) {
+    const input = document.getElementById(inputId);
     if (input && (input.tagName === 'INPUT' || input.tagName === 'TEXTAREA')) {
         const start = input.selectionStart || 0;
         const end = input.selectionEnd || 0;
@@ -265,6 +284,8 @@ function insertPlaceholder(token) {
         input.setSelectionRange(start + token.length, start + token.length);
     }
 }
+
+
 
 // 生成列索引
 function generateIndexes() {
@@ -292,11 +313,9 @@ function toggleDataSource() {
     document.getElementById('outMySQL').style.display = outType === 'mysql' ? 'block' : 'none';
     document.getElementById('outFS').style.display = outType === 'mysql' ? 'none' : 'block';
     
-    // 显示/隐藏分隔符框
-    const inFileType = document.getElementById('inFileType').value;
-    const outFileType = document.getElementById('outFileType').value;
-    document.getElementById('inDelimiterBox').style.display = (inType !== 'mysql' && inFileType === 'text') ? 'block' : 'none';
-    document.getElementById('outDelimiterBox').style.display = (outType !== 'mysql' && outFileType === 'text') ? 'block' : 'none';
+    // 显示/隐藏分隔符框 - 文件系统类型时始终显示
+    document.getElementById('inDelimiterBox').style.display = inType !== 'mysql' ? 'block' : 'none';
+    document.getElementById('outDelimiterBox').style.display = outType !== 'mysql' ? 'block' : 'none';
     
     // 筛选数据源选项
     filterOptions('inFSSelect', inType);
@@ -394,12 +413,40 @@ function generatePreview() {
     const inType = document.getElementById('inType').value;
     const outType = document.getElementById('outType').value;
 
+    // 验证文件系统分隔符必填
+    if (inType !== 'mysql') {
+        const inDelimiter = document.getElementById('inDelimiter').value.trim();
+        if (!inDelimiter) {
+            document.getElementById('pvStatus').textContent = '文件系统输入时，文本分隔符为必填项';
+            document.getElementById('pvStatus').className = 'help warn';
+            return;
+        }
+    }
+
+    if (outType !== 'mysql') {
+        const outDelimiter = document.getElementById('outDelimiter').value.trim();
+        if (!outDelimiter) {
+            document.getElementById('pvStatus').textContent = '文件系统输出时，文本分隔符为必填项';
+            document.getElementById('pvStatus').className = 'help warn';
+            return;
+        }
+    }
+
+    // 构建columns数据，包含data_type
+    const columns = [];
+    const checkedBoxes = document.querySelectorAll('#colsBox input[type="checkbox"]:checked');
+    checkedBoxes.forEach(cb => {
+        const name = cb.dataset.name;
+        const dataType = cb.dataset.type || '';
+        columns.push({name, data_type: dataType});
+    });
+
     const payload = {
         inType, outType,
         mysqlBase: inType === 'mysql' ? 'in' : 'out',
         in: {}, out: {},
         mysqlWhere: inType === 'mysql' ? (document.getElementById('inWhere').value || '') : '',
-        columns: cols.map(name => ({name, data_type: ''}))
+        columns: columns
     };
 
     // 构建输入配置
@@ -413,10 +460,10 @@ function generatePreview() {
             fs_id: Number(document.getElementById('inFSSelect').value || 0),
             fileType: document.getElementById('inFileType').value,
             path: document.getElementById('inPath').value.trim(),
+            filename: document.getElementById('inFilename').value.trim() || undefined,
             indexes: (document.getElementById('inIndexes').value || '')
                 .split(',').map(s => parseInt(s.trim(), 10)).filter(Number.isInteger),
-            fieldDelimiter: document.getElementById('inFileType').value === 'text' ? 
-                (document.getElementById('inDelimiter').value || ',') : undefined
+            fieldDelimiter: document.getElementById('inDelimiter').value.trim()
         };
     }
 
@@ -431,8 +478,9 @@ function generatePreview() {
             fs_id: Number(document.getElementById('outFSSelect').value || 0),
             fileType: document.getElementById('outFileType').value,
             path: document.getElementById('outPath').value.trim(),
-            fieldDelimiter: document.getElementById('outFileType').value === 'text' ? 
-                (document.getElementById('outDelimiter').value || '\\t') : undefined
+            filename: document.getElementById('outFilename').value.trim() || undefined,
+            writeMode: document.getElementById('outWriteMode').value || 'nonConflict',
+            fieldDelimiter: document.getElementById('outDelimiter').value.trim()
         };
     }
 

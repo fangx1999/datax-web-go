@@ -52,11 +52,22 @@ type MySQLConfig struct {
 	Table    string `json:"table"`
 }
 
+// 文件系统写入模式
+type WriteMode string
+
+const (
+	WriteModeAppend      WriteMode = "append"      // 直接追加，不做任何处理
+	WriteModeNonConflict WriteMode = "nonConflict" // 如果文件存在则报错
+	WriteModeTruncate    WriteMode = "truncate"    // 如果文件存在则先删除后写入
+)
+
 // 文件系统配置
 type FSConfig struct {
 	FSID           int        `json:"fs_id"`
 	FileType       FileFormat `json:"fileType"`
 	Path           string     `json:"path"`
+	Filename       *string    `json:"filename,omitempty"`
+	WriteMode      WriteMode  `json:"writeMode,omitempty"`
 	Indexes        []int      `json:"indexes"`
 	FieldDelimiter *string    `json:"fieldDelimiter,omitempty"`
 }

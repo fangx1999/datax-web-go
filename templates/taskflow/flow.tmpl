@@ -8,9 +8,7 @@
     <div class="controls">
       <a class="btn" href="/task-flows">← 返回列表</a>
       <a class="btn" href="/task-flows/{{.FlowID}}">属性编辑</a>
-      <form method="post" action="/task-flows/{{.FlowID}}/run" style="display:inline">
-        <button class="btn primary" type="submit">立即执行</button>
-      </form>
+      <button class="btn primary" id="run-taskflow-btn" data-id="{{.FlowID}}" data-name="{{.Name}}">立即执行</button>
     </div>
   </div>
 
@@ -640,7 +638,36 @@ document.addEventListener('DOMContentLoaded', function() {
   if (flowSteps) {
     initDeleteButtons('flowSteps', '/task-flows/{{.FlowID}}/steps/{id}', '步骤');
   }
+  
+  // 初始化执行按钮
+  const runBtn = document.getElementById('run-taskflow-btn');
+  if (runBtn) {
+    runBtn.addEventListener('click', function() {
+      const flowId = this.getAttribute('data-id');
+      const flowName = this.getAttribute('data-name');
+      
+      runTaskFlow(flowId, flowName);
+    });
+  }
 });
+
+function runTaskFlow(flowId, flowName) {
+  fetch(`/task-flows/${flowId}/run`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    // 直接跳转到执行日志页面
+    window.location.href = `/flow-logs`;
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('执行失败: ' + error.message);
+  });
+}
 </script>
 
 {{template "footer" .}}

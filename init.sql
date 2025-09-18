@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS `users`
     `disabled`   TINYINT(1)            NOT NULL DEFAULT 0 COMMENT '是否禁用：0启用，1禁用',
     `created_by` INT                            DEFAULT NULL COMMENT '创建者用户ID',
     `updated_by` INT                            DEFAULT NULL COMMENT '更新者用户ID',
-    `created_at` DATETIME              NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at` DATETIME              NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+    `created_at` TIMESTAMP             NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` TIMESTAMP             NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -43,8 +43,8 @@ CREATE TABLE `data_sources`
     `hadoopconfig` TEXT         DEFAULT NULL COMMENT 'Hadoop配置信息JSON，用于HDFS/OFS/COSN类型',
     `created_by`   INT          DEFAULT NULL COMMENT '创建者用户ID',
     `updated_by`   INT          DEFAULT NULL COMMENT '更新者用户ID',
-    `created_at`   DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at`   DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+    `created_at`   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -60,8 +60,8 @@ CREATE TABLE `tasks`
     `json_config` MEDIUMTEXT COMMENT 'DataX任务配置JSON，包含reader和writer配置',
     `created_by`  INT      DEFAULT NULL COMMENT '创建者用户ID',
     `updated_by`  INT      DEFAULT NULL COMMENT '更新者用户ID',
-    `created_at`  DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at`  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+    `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -73,19 +73,17 @@ CREATE TABLE `task_logs`
 (
     `id`                INT AUTO_INCREMENT PRIMARY KEY COMMENT '日志ID，主键',
     `task_id`           INT                                                              NOT NULL COMMENT '任务ID，关联tasks表',
-    `execution_context` ENUM ('standalone','flow_step')                                  NOT NULL DEFAULT 'standalone' COMMENT '执行上下文：standalone独立任务，flow_step任务流步骤',
     `flow_execution_id` INT                                                                       DEFAULT NULL COMMENT '任务流执行ID，如果为NULL则表示独立任务执行',
     `step_id`           INT                                                                       DEFAULT NULL COMMENT '任务流步骤ID，如果为NULL则表示独立任务执行',
     `step_order`        INT                                                                       DEFAULT NULL COMMENT '步骤顺序，用于任务流中的步骤排序',
     `execution_type`    ENUM ('scheduled','manual')                                      NOT NULL DEFAULT 'manual' COMMENT '执行类型：scheduled定时执行，manual手动执行',
-    `start_time`        DATETIME                                     NOT NULL COMMENT '开始执行时间',
-    `end_time`          DATETIME                                              DEFAULT NULL COMMENT '结束执行时间，NULL表示仍在运行',
+    `start_time`        TIMESTAMP                                    NOT NULL COMMENT '开始执行时间',
+    `end_time`          TIMESTAMP                                           COMMENT '结束执行时间，NULL表示仍在运行',
     `status`            ENUM ('pending','running','success','failed','killed','skipped') NOT NULL DEFAULT 'pending' COMMENT '执行状态：pending等待，running运行中，success成功，failed失败，killed已终止，skipped跳过',
-    `log`               MEDIUMTEXT                                   NOT NULL DEFAULT '' COMMENT '执行日志内容',
-    `created_at`        DATETIME                                                                  DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `log`               MEDIUMTEXT                                   NOT NULL  COMMENT '执行日志内容',
+    `created_at`        TIMESTAMP                                                                 DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX `idx_flow_execution` (`flow_execution_id`),
     INDEX `idx_step_id` (`step_id`),
-    INDEX `idx_execution_context` (`execution_context`),
     INDEX `idx_task_id` (`task_id`),
     INDEX `idx_start_time` (`start_time`)
 ) ENGINE = InnoDB
@@ -103,8 +101,8 @@ CREATE TABLE `task_flows`
     `enabled`     TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '是否启用：1启用，0禁用',
     `created_by`  INT                   DEFAULT NULL COMMENT '创建者用户ID',
     `updated_by`  INT                   DEFAULT NULL COMMENT '更新者用户ID',
-    `created_at`  DATETIME              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at`  DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+    `created_at`  TIMESTAMP             DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`  TIMESTAMP             DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -119,8 +117,8 @@ CREATE TABLE `task_flow_steps`
     `timeout_minutes` INT      DEFAULT NULL COMMENT '超时时间（分钟），NULL表示不限制',
     `created_by`      INT      DEFAULT NULL COMMENT '创建者用户ID',
     `updated_by`      INT      DEFAULT NULL COMMENT '更新者用户ID',
-    `created_at`      DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at`      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `created_at`      TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY `uk_flow_step` (`flow_id`, `step_order`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
@@ -133,8 +131,8 @@ CREATE TABLE `task_flow_executions`
     `flow_id`        INT                                          NOT NULL COMMENT '任务流ID，关联task_flows表',
     `status`         ENUM ('running','success','failed','killed') NOT NULL COMMENT '执行状态：running运行中，success成功，failed失败，killed已终止',
     `execution_type` ENUM ('scheduled','manual')                  NOT NULL DEFAULT 'scheduled' COMMENT '执行类型：scheduled定时执行，manual手动执行',
-    `start_time`     DATETIME                                     NOT NULL COMMENT '开始执行时间',
-    `end_time`       DATETIME                                              DEFAULT NULL COMMENT '结束执行时间，NULL表示仍在运行',
-    `created_at`     DATETIME                                              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+    `start_time`     TIMESTAMP                                    NOT NULL COMMENT '开始执行时间',
+    `end_time`       TIMESTAMP                                             COMMENT '结束执行时间，NULL表示仍在运行',
+    `created_at`     TIMESTAMP                                             DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;

@@ -45,9 +45,7 @@
           <td class="actions">
             <a class="linklike" href="/task-flows/{{.ID}}">编辑</a>
             <a class="linklike" href="/task-flows/{{.ID}}/flow">流程</a>
-            <form method="post" action="/task-flows/{{.ID}}/run" style="display:inline">
-              <button class="linklike" type="submit" title="立即执行">执行</button>
-            </form>
+            <button class="linklike js-run-taskflow" data-id="{{.ID}}" data-name="{{.Name}}" title="立即执行">执行</button>
             <form method="post" action="/task-flows/{{.ID}}/toggle" style="display:inline">
               <button class="linklike" type="submit" title="{{if .Enabled}}禁用{{else}}启用{{end}}">{{if .Enabled}}禁用{{else}}启用{{end}}</button>
             </form>
@@ -71,7 +69,40 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 初始化删除按钮
   initDeleteButtons('flowTable', '/task-flows/{id}', '任务流');
+  
+  // 初始化执行按钮
+  initRunTaskFlowButtons();
 });
+
+function initRunTaskFlowButtons() {
+  document.querySelectorAll('.js-run-taskflow').forEach(button => {
+    button.addEventListener('click', function(e) {
+      e.preventDefault();
+      const flowId = this.getAttribute('data-id');
+      const flowName = this.getAttribute('data-name');
+      
+      runTaskFlow(flowId, flowName);
+    });
+  });
+}
+
+function runTaskFlow(flowId, flowName) {
+  fetch(`/task-flows/${flowId}/run`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    // 直接跳转到执行日志页面
+    window.location.href = `/flow-logs`;
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('执行失败: ' + error.message);
+  });
+}
 </script>
 
 {{template "footer" .}}

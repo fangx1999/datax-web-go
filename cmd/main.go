@@ -22,7 +22,7 @@ import (
 // 它设置合理的连接池大小并 ping 数据库以确保
 // 连接性。如果无法建立连接，程序将终止。
 func setupDatabase(cfg *util.Config) *sql.DB {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4&loc=Asia%%2FShanghai",
 		cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {

@@ -251,7 +251,16 @@ function getExecutionTypeBadge(type) {
 function formatDateTime(dateTimeStr) {
     if (!dateTimeStr) return '-';
     const date = new Date(dateTimeStr);
-    return date.toLocaleString('zh-CN');
+    // 强制转换为UTC+8时区显示
+    return date.toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
 }
 
 // HTML转义
