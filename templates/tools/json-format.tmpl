@@ -1,0 +1,13 @@
+{{define "tools/json-format.tmpl"}}
+{{template "header" .}}
+<h1>JSON 格式化工具</h1>
+<p>在下方输入或粘贴任意 JSON 内容，点击格式化或压缩按钮即可查看结果。</p>
+<textarea id="jsonInput" style="width:100%;height:200px;font-family:monospace;"></textarea>
+<div style="margin-top:8px;">
+    <button class="btn" type="button" onclick="formatJSON()">格式化</button>
+    <button class="btn" type="button" onclick="minifyJSON()">压缩</button>
+</div>
+<pre id="jsonOutput" class="json" style="margin-top:12px;"></pre>
+<script src="/static/js/json_format.js"></script>
+{{template "footer" .}}
+{{end}}

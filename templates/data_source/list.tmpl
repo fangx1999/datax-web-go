@@ -1,0 +1,199 @@
+{{define "data_source/list.tmpl"}}
+{{template "header" .}}
+
+<div class="page">
+    <div class="toolbar">
+        <h1 class="h1">数据源管理</h1>
+        <div class="controls">
+            <input id="q" type="search" placeholder="搜索名称或ID" aria-label="搜索名称或ID">
+            <select id="typeFilter" aria-label="按类型筛选">
+                <option value="">全部类型</option>
+                <option value="mysql">MySQL</option>
+                <option value="ofs">OFS</option>
+                <option value="hdfs">HDFS</option>
+                <option value="cosn">COSN</option>
+            </select>
+            <button class="btn primary" type="button" id="btnNewDs">➕ 添加数据源</button>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table" id="dsTable">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>名称</th>
+                <th>类型</th>
+                <th>创建人</th>
+                <th>最后操作人</th>
+                <th>创建时间</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {{if .DataSources}}
+            {{range .DataSources}}
+            <tr data-id="{{.ID}}" data-name="{{.Name}}" data-type="{{.Type}}">
+                <td>{{.ID}}</td>
+                <td>{{.Name}}</td>
+                <td><span class="type-badge">{{.Type}}</span></td>
+                <td>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</td>
+                <td>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</td>
+                <td>{{.CreatedAt.Format "2006-01-02 15:04:06"}}</td>
+                <td class="actions">
+                    <a class="linklike js-edit" href="#" data-id="{{.ID}}">编辑</a>
+                    <button class="linklike js-delete" data-id="{{.ID}}" data-name="{{.Name}}">删除</button>
+                </td>
+            </tr>
+            {{end}}
+            {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{template "data_source/modal.tmpl" .}}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // 使用通用搜索筛选功能
+  createTableFilter('dsTable', 'q', 'typeFilter', {
+    searchFields: ['name', 'id'],
+    filterField: 'type',
+    emptyText: '无匹配结果'
+  });
+
+  // 新建数据源按钮
+  document.getElementById('btnNewDs').addEventListener('click', function () {
+    prepareCreateForm();
+    if (typeof openDsModal === 'function') {
+      openDsModal();
+    } else {
+      console.error('openDsModal function not found');
+    }
+  });
+
+  // 初始化删除按钮
+  initDeleteButtons('dsTable', '/data-sources/{id}', '数据源');
+
+  // 编辑数据源按钮
+  document.getElementById('dsTable').addEventListener('click', function (e) {
+    var editBtn = e.target.closest('.js-edit');
+    
+    if (editBtn) {
+      e.preventDefault();
+      var id = editBtn.dataset.id;
+      if (!id) {
+        location.href = editBtn.href;
+        return;
+      }
+      
+      // 使用通用API请求函数
+      apiRequest('/data-sources/' + id + '?format=json')
+        .then(function (result) {
+          if (result.success && result.data) {
+            prepareEditForm(result.data);
+            if (typeof openDsModal === 'function') {
+              openDsModal();
+            } else {
+              console.error('openDsModal function not found');
+            }
+          } else {
+            console.error('加载数据失败:', result.error);
+            alert('加载数据失败：' + result.error);
+          }
+        })
+        .catch(function(error) {
+          console.error('请求异常:', error);
+          alert('请求异常：' + error.message);
+        });
+    }
+  });
+
+  // —— 跟弹窗交互：这些函数在 modal 里会读取
+  window.prepareCreateForm = function () {
+    var form = document.getElementById('dsForm'), typeEl = document.getElementById('dstype');
+    if (!form) return;
+    form.reset();
+    form.action = '/data-sources';
+    typeEl.value = 'mysql';
+    typeEl.dispatchEvent(new Event('change'));
+    var title = document.getElementById('dsTitle');
+    if (title) title.textContent = '新建数据源';
+    var badge = document.getElementById('dsBadge');
+    if (badge) badge.textContent = '创建中';
+  };
+  
+  window.prepareEditForm = function (ds) {
+    var form = document.getElementById('dsForm');
+    if (!form) {
+      console.error('找不到表单元素 dsForm');
+      return;
+    }
+    
+    var typeEl = document.getElementById('dstype');
+    if (!typeEl) {
+      console.error('找不到类型选择元素 dstype');
+    }
+    
+    // 使用统一的字段标准化函数
+    var normalizedDs = normalizeDataSourceFields(ds);
+    
+    form.reset();
+    form.action = '/data-sources/' + normalizedDs.id;
+    
+    var hid = form.querySelector('input[name="id"]');
+    if (!hid) {
+      hid = document.createElement('input');
+      hid.type = 'hidden';
+      hid.name = 'id';
+      form.prepend(hid);
+    }
+    hid.value = normalizedDs.id;
+    
+    var nameEl = document.getElementById('name');
+    if (nameEl) {
+      nameEl.value = normalizedDs.name || '';
+    } else {
+      console.error('找不到名称字段');
+    }
+    
+    var t = (normalizedDs.type || 'mysql').toLowerCase();
+    if (typeEl) {
+      typeEl.value = t;
+      typeEl.dispatchEvent(new Event('change'));
+    }
+
+    // 回填字段（存在才填）
+    function setVal(id, v) {
+      var el = document.getElementById(id);
+      if (el && v != null) {
+        el.value = v;
+      }
+    }
+
+    setVal('db_url', normalizedDs.db_url);
+    setVal('db_database', normalizedDs.db_database);
+    setVal('db_user', normalizedDs.db_user);
+    // 密码字段不设置值，避免密码泄漏警告
+    // setVal('db_password', normalizedDs.db_password);
+    setVal('ofs_defaultfs', normalizedDs.defaultfs);
+    setVal('ofs_hadoopconfig', normalizedDs.hadoopconfig);
+    setVal('hdfs_defaultfs', normalizedDs.defaultfs);
+    setVal('hdfs_hadoopconfig', normalizedDs.hadoopconfig);
+    setVal('cosn_defaultfs', normalizedDs.defaultfs);
+    setVal('cosn_hadoopconfig', normalizedDs.hadoopconfig);
+    ['db_url', 'db_database', 'db_user', 'db_password'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.dispatchEvent(new Event('input'));
+    });
+    var title = document.getElementById('dsTitle');
+    if (title) title.textContent = '编辑数据源';
+    var badge = document.getElementById('dsBadge');
+    if (badge) badge.textContent = 'ID: ' + normalizedDs.id;
+  };
+});
+</script>
+
+{{template "footer" .}}
+{{end}}

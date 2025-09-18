@@ -1,0 +1,647 @@
+{{define "taskflow/flow.tmpl"}}
+{{template "header" .}}
+
+<div class="page">
+  <!-- 页面头部 -->
+  <div class="toolbar">
+    <h1 class="h1">{{.Name}} - 流程图编辑</h1>
+    <div class="controls">
+      <a class="btn" href="/task-flows">← 返回列表</a>
+      <a class="btn" href="/task-flows/{{.FlowID}}">属性编辑</a>
+      <form method="post" action="/task-flows/{{.FlowID}}/run" style="display:inline">
+        <button class="btn primary" type="submit">立即执行</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="flow-container">
+    <div class="flow-header">
+      <h3>任务流程图</h3>
+      <div class="flow-controls">
+        <button class="btn" onclick="showAddStepModal()">添加步骤</button>
+        <button class="btn" onclick="saveFlowOrder()">保存顺序</button>
+        <div class="drag-hint">💡 拖拽步骤卡片调整顺序，完成后点击"保存顺序"按钮</div>
+      </div>
+    </div>
+    
+    <div class="flow-diagram" id="flowDiagram">
+      {{if .Steps}}
+        <div class="flow-steps" id="flowSteps">
+          {{range .Steps}}
+          <div class="flow-step" data-step-id="{{.ID}}" data-step-order="{{.StepOrder}}" draggable="true" title="拖拽调整顺序">
+            <div class="step-node">
+              <div class="step-header">
+                <span class="step-order">{{.StepOrder}}</span>
+                <button class="step-delete-btn js-delete" data-id="{{.ID}}" data-name="{{.TaskName}}" title="删除步骤">×</button>
+              </div>
+              <div class="step-content">
+                <h4><a href="/tasks/{{.TaskID}}">{{.TaskName}}</a></h4>
+                <div class="step-meta">
+                  {{if .TimeoutMinutes}}<span class="timeout">{{.TimeoutMinutes}}分钟</span>{{end}}
+                </div>
+              </div>
+            </div>
+            <div class="step-arrow" style="display: {{if not (eq .StepOrder (len $.Steps))}}block{{else}}none{{end}}">→</div>
+          </div>
+          {{end}}
+        </div>
+      {{else}}
+        <div class="empty-flow">
+          <div class="empty-icon">📋</div>
+          <h4>暂无任务步骤</h4>
+          <p>点击"添加步骤"开始创建任务流程</p>
+          <button class="btn primary" onclick="showAddStepModal()">添加第一个步骤</button>
+        </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<!-- Add Step Modal -->
+<div id="addStepModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>添加任务步骤</h3>
+      <button class="close" onclick="hideAddStepModal()">&times;</button>
+    </div>
+    <form method="post" action="/task-flows/{{.FlowID}}/steps">
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="task_id">选择任务 *</label>
+          <select id="task_id" name="task_id" required>
+            <option value="">请选择任务</option>
+            {{range .AvailableTasks}}
+            <option value="{{.ID}}">{{.Name}}</option>
+            {{end}}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="timeout_minutes">超时时间(分钟)</label>
+          <input type="number" id="timeout_minutes" name="timeout_minutes" min="1" placeholder="留空表示无超时">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn primary">添加步骤</button>
+        <button type="button" class="btn" onclick="hideAddStepModal()">取消</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<style>
+/* 流程图编辑页面样式 */
+.flow-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.flow-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.flow-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.flow-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.drag-hint {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--bg);
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.flow-diagram {
+  min-height: 600px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 32px;
+  position: relative;
+}
+
+.flow-steps {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  min-height: 400px;
+}
+
+.flow-step {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: move;
+  transition: all 0.2s ease;
+}
+
+.flow-step:hover {
+  transform: translateY(-2px);
+}
+
+.flow-step.dragging {
+  opacity: 0.5;
+  transform: rotate(5deg);
+}
+
+.step-node {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 200px;
+  box-shadow: var(--shadow);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.step-node:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-color: var(--primary);
+}
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.step-order {
+  background: var(--primary);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.step-delete-btn {
+  background: var(--error);
+  color: white;
+  border: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.step-delete-btn:hover {
+  opacity: 1;
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+
+.step-content h4 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.step-content h4 a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.step-content h4 a::after {
+  content: "🔗";
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.step-content h4 a:hover {
+  color: var(--primary);
+  text-decoration: underline;
+  transform: translateX(2px);
+}
+
+.step-content h4 a:hover::after {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.step-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.condition, .timeout {
+  background: var(--bg);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.step-arrow {
+  font-size: 24px;
+  color: var(--primary);
+  font-weight: bold;
+  user-select: none;
+}
+
+.empty-flow {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-flow h4 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.empty-flow p {
+  margin: 0 0 20px;
+  font-size: 14px;
+}
+
+/* 拖拽样式 */
+.flow-step {
+  transition: all 0.2s ease;
+}
+
+.flow-step.dragging {
+  opacity: 0.5;
+  transform: rotate(5deg);
+  z-index: 1000;
+}
+
+.flow-step.drag-over {
+  border: 2px dashed var(--primary);
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  transform: scale(1.02);
+}
+
+.flow-step:hover {
+  cursor: move;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.drop-zone {
+  border: 2px dashed var(--primary);
+  background: color-mix(in oklab, var(--primary) 5%, transparent);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  color: var(--primary);
+  font-weight: 600;
+  margin: 10px 0;
+}
+
+/* 通知动画 */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* 模态框样式 */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 0;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.close:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--text);
+  transition: all 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus);
+  outline: none;
+}
+
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .flow-steps {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .flow-step {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .step-arrow {
+    transform: rotate(90deg);
+    text-align: center;
+    margin: 8px 0;
+  }
+  
+  .flow-controls {
+    flex-wrap: wrap;
+  }
+  
+  .flow-diagram {
+    min-height: 500px;
+    padding: 20px;
+  }
+}
+</style>
+
+<script>
+// 拖拽功能
+let draggedElement = null;
+
+// 初始化拖拽功能
+function initDragAndDrop() {
+  const flowSteps = document.getElementById('flowSteps');
+  if (!flowSteps) return;
+
+  const steps = flowSteps.querySelectorAll('.flow-step');
+  steps.forEach(step => {
+    step.draggable = true;
+    step.addEventListener('dragstart', handleDragStart);
+    step.addEventListener('dragend', handleDragEnd);
+    step.addEventListener('dragover', handleDragOver);
+    step.addEventListener('drop', handleDrop);
+  });
+}
+
+function handleDragStart(e) {
+  draggedElement = this;
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+  this.classList.remove('dragging');
+  document.querySelectorAll('.flow-step').forEach(step => {
+    step.classList.remove('drag-over');
+  });
+  draggedElement = null;
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (draggedElement && draggedElement !== this) {
+    this.classList.add('drag-over');
+  }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over');
+  
+  if (draggedElement && draggedElement !== this) {
+    const parent = this.parentNode;
+    const nextSibling = this.nextSibling;
+    parent.insertBefore(draggedElement, nextSibling);
+    updateStepOrder();
+  }
+}
+
+function updateStepOrder() {
+  const steps = document.querySelectorAll('.flow-step');
+  steps.forEach((step, index) => {
+    const orderElement = step.querySelector('.step-order');
+    if (orderElement) {
+      orderElement.textContent = index + 1;
+    }
+    
+    // 更新箭头显示
+    const arrow = step.querySelector('.step-arrow');
+    if (arrow) {
+      // 如果不是最后一个步骤，显示箭头
+      if (index < steps.length - 1) {
+        arrow.style.display = 'block';
+      } else {
+        arrow.style.display = 'none';
+      }
+    }
+  });
+}
+
+// 页面加载完成后初始化拖拽功能
+document.addEventListener('DOMContentLoaded', function() {
+  initDragAndDrop();
+  // 初始化箭头显示
+  updateStepOrder();
+});
+
+// 流程图相关功能
+
+function saveFlowOrder() {
+  const steps = document.querySelectorAll('.flow-step');
+  
+  const stepOrders = Array.from(steps).map((step, index) => {
+    const stepId = step.dataset.stepId;
+    return stepId;
+  });
+  
+  if (stepOrders.length === 0) {
+    alert('没有步骤需要保存');
+    return;
+  }
+  
+  const formData = new FormData();
+  stepOrders.forEach(stepId => {
+    formData.append('step_order', stepId);
+  });
+  
+  // 显示保存状态
+  const saveBtn = document.querySelector('button[onclick="saveFlowOrder()"]');
+  if (saveBtn) {
+    saveBtn.textContent = '保存中...';
+    saveBtn.disabled = true;
+  }
+  
+  fetch('/task-flows/{{.FlowID}}/steps/reorder', {
+    method: 'PUT',
+    body: formData
+  })
+  .then(response => {
+    if (response.ok) {
+      alert('步骤顺序保存成功');
+    } else {
+      return response.text().then(text => {
+        throw new Error(text || '保存失败');
+      });
+    }
+  })
+  .catch(error => {
+    console.error('Save error:', error);
+    alert('保存失败: ' + error.message);
+  })
+  .finally(() => {
+    // 恢复按钮状态
+    if (saveBtn) {
+      saveBtn.textContent = '保存顺序';
+      saveBtn.disabled = false;
+    }
+  });
+}
+
+
+// 模态框功能
+function showAddStepModal() {
+  document.getElementById('addStepModal').style.display = 'flex';
+}
+
+function hideAddStepModal() {
+  document.getElementById('addStepModal').style.display = 'none';
+}
+
+// 初始化步骤删除按钮
+document.addEventListener('DOMContentLoaded', function() {
+  // 为步骤删除按钮初始化通用删除功能
+  const flowSteps = document.getElementById('flowSteps');
+  if (flowSteps) {
+    initDeleteButtons('flowSteps', '/task-flows/{{.FlowID}}/steps/{id}', '步骤');
+  }
+});
+</script>
+
+{{template "footer" .}}
+{{end}}

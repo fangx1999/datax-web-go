@@ -1,0 +1,78 @@
+{{define "taskflow/list.tmpl"}}
+{{template "header" .}}
+
+<div class="page">
+  <div class="toolbar">
+    <h1 class="h1">任务流管理</h1>
+    <div class="controls">
+      <input id="q" type="search" placeholder="搜索任务流名称或ID…">
+      <select id="enableFilter" aria-label="按启用筛选">
+        <option value="">全部</option>
+        <option value="1">已启用</option>
+        <option value="0">未启用</option>
+      </select>
+      <a class="btn primary" href="/task-flows/new">➕ 新建任务流</a>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table" id="flowTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>名称</th>
+          <th>描述</th>
+          <th>调度(CRON)</th>
+          <th>启用</th>
+          <th>创建人</th>
+          <th>最后操作人</th>
+          <th>创建时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{if .Flows}}
+      {{range .Flows}}
+        <tr data-id="{{.ID}}" data-name="{{.Name}}" data-enabled="{{if .Enabled}}1{{else}}0{{end}}">
+          <td>{{.ID}}</td>
+          <td>{{.Name}}</td>
+          <td>{{.Description}}</td>
+          <td><code>{{.CronExpr}}</code></td>
+          <td>{{if .Enabled}}✅{{else}}❌{{end}}</td>
+          <td>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</td>
+          <td>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</td>
+          <td>{{.CreatedAt.Format "2006-01-02 15:04:06"}}</td>
+          <td class="actions">
+            <a class="linklike" href="/task-flows/{{.ID}}">编辑</a>
+            <a class="linklike" href="/task-flows/{{.ID}}/flow">流程</a>
+            <form method="post" action="/task-flows/{{.ID}}/run" style="display:inline">
+              <button class="linklike" type="submit" title="立即执行">执行</button>
+            </form>
+            <form method="post" action="/task-flows/{{.ID}}/toggle" style="display:inline">
+              <button class="linklike" type="submit" title="{{if .Enabled}}禁用{{else}}启用{{end}}">{{if .Enabled}}禁用{{else}}启用{{end}}</button>
+            </form>
+            <button class="linklike js-delete" data-id="{{.ID}}" data-name="{{.Name}}" title="删除">删除</button>
+          </td>
+        </tr>
+      {{end}}
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  createTableFilter('flowTable', 'q', 'enableFilter', {
+    searchFields: ['name', 'id'],
+    filterField: 'enabled',
+    emptyText: '暂无任务流'
+  });
+  
+  // 初始化删除按钮
+  initDeleteButtons('flowTable', '/task-flows/{id}', '任务流');
+});
+</script>
+
+{{template "footer" .}}
+{{end}}

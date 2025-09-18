@@ -1,0 +1,34 @@
+{{define "header"}}
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{block "title" .}}DataX-Web-Go{{end}}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="/static/js/common.js"></script>
+</head>
+<body>
+  <header class="topnav">
+    <div class="container nav-inner">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"></span>
+        <a href="/">DataX-Web-UI</a>
+      </div>
+      <nav class="nav-links" role="navigation">
+        <a href="/tasks" id="tasks">任务</a>
+        <a href="/task-flows" id="taskflows">任务流</a>
+        <a href="/flow-logs" id="flow-logs">任务流日志</a>
+        <a href="/task-logs" id="task-logs">任务日志</a>
+        <a href="/data-sources" id="data_sources">数据源</a>
+
+        <a href="/tools/json-format" id="json-tools">JSON工具</a>
+        <a href="/admin/users" id="users">用户</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="btn" href="/logout">退出</a>
+      </div>
+    </div>
+  </header>
+  <main class="container page">
+{{end}}

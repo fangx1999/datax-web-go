@@ -1,0 +1,99 @@
+{{define "task/list.tmpl"}}
+{{template "header" .}}
+
+<div class="page">
+  <div class="toolbar">
+    <h1 class="h1">任务管理</h1>
+    <div class="controls">
+      <input id="q" type="search" placeholder="搜索任务名称或ID…">
+      <select id="flowFilter" aria-label="按任务流筛选">
+        <option value="">全部任务流</option>
+        <option value="unassigned">未分配</option>
+      </select>
+      <a class="btn primary" href="/tasks/new">➕ 新建任务</a>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table" id="taskTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>名称</th>
+          <th>所属任务流</th>
+          <th>创建人</th>
+          <th>最后操作人</th>
+          <th>创建时间</th>
+          <th>更新时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{if .Tasks}}
+      {{range .Tasks}}
+        <tr data-id="{{.ID}}" data-name="{{.Name}}" data-flow="{{.FlowName}}">
+          <td>{{.ID}}</td>
+          <td>{{.Name}}</td>
+          <td>
+            {{if .FlowID}}
+              {{.FlowName}}
+            {{else}}
+              <span class="text-muted">未分配</span>
+            {{end}}
+          </td>
+          <td>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</td>
+          <td>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</td>
+          <td>{{.CreatedAt.Format "2006-01-02 15:04:06"}}</td>
+          <td>{{.UpdatedAt.Format "2006-01-02 15:04:06"}}</td>
+          <td class="actions">
+            <a class="linklike" href="/tasks/{{.ID}}">管理</a>
+            <form method="post" action="/tasks/{{.ID}}/run" style="display:inline"><button class="linklike" type="submit" title="立即执行">执行</button></form>
+            <button class="linklike js-delete" data-id="{{.ID}}" data-name="{{.Name}}" title="删除">删除</button>
+          </td>
+        </tr>
+      {{end}}
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // 动态加载任务流选项
+  loadFlowFilterOptions();
+  
+  createTableFilter('taskTable', 'q', 'flowFilter', {
+    searchFields: ['name', 'id'],
+    filterField: 'flow',
+    emptyText: '暂无任务'
+  });
+  
+  // 初始化删除按钮
+  initDeleteButtons('taskTable', '/tasks/{id}', '任务');
+});
+
+function loadFlowFilterOptions() {
+  // 从页面数据中提取任务流信息
+  const rows = document.querySelectorAll('#taskTable tbody tr[data-flow]');
+  const flows = new Set();
+  
+  rows.forEach(row => {
+    const flowName = row.getAttribute('data-flow');
+    if (flowName && flowName !== '未分配') {
+      flows.add(flowName);
+    }
+  });
+  
+  const flowFilter = document.getElementById('flowFilter');
+  flows.forEach(flowName => {
+    const option = document.createElement('option');
+    option.value = flowName;
+    option.textContent = flowName;
+    flowFilter.appendChild(option);
+  });
+}
+</script>
+
+{{template "footer" .}}
+{{end}}

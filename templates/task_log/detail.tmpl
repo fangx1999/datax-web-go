@@ -1,0 +1,136 @@
+{{define "task_log/detail.tmpl"}}
+{{template "header" .}}
+
+<div style="position: fixed; top: 60px; left: 0; right: 0; bottom: 0; background: white; z-index: 999;">
+    <div class="card" style="margin: 0; border: none; border-radius: 0; height: 100%; display: flex; flex-direction: column;">
+        <div class="card-header d-flex justify-content-between align-items-center" style="padding: 10px 20px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; flex-shrink: 0;">
+            <h3 style="margin: 0;">任务执行详情</h3>
+            <a href="/task-logs" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回列表
+            </a>
+        </div>
+        <div class="card-body p-0" style="flex: 1; overflow: hidden;">
+            <div id="logDetailContent" style="height: 100%; width: 100%;">
+                <div style="text-align: center; padding: 50px;">
+                    <div class="spinner-border" role="status">
+                        <span class="sr-only">加载中...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 页面加载时获取日志详情
+document.addEventListener('DOMContentLoaded', function() {
+    const logId = getLogIdFromUrl();
+    if (logId) {
+        loadLogDetail(logId);
+    } else {
+        showError('无效的日志ID');
+    }
+});
+
+// 从URL获取日志ID
+function getLogIdFromUrl() {
+    const path = window.location.pathname;
+    const match = path.match(/\/task-logs\/(\d+)/);
+    return match ? match[1] : null;
+}
+
+// 加载日志详情
+function loadLogDetail(logId) {
+    fetch(`/api/task-logs/${logId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderLogDetail(data.data);
+            } else {
+                showError('获取日志详情失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showError('获取日志详情失败');
+        });
+}
+
+// 渲染日志详情
+function renderLogDetail(log) {
+    const logContent = log.log_content ? 
+        `<pre style="height: 100%; width: 100%; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.4; margin: 0; padding: 20px; background: #1e1e1e; color: #d4d4d4;">${escapeHtml(log.log_content)}</pre>` : 
+        '<div style="text-align: center; padding: 50px; color: #6c757d;"><p>暂无日志内容</p></div>';
+
+    document.getElementById('logDetailContent').innerHTML = logContent;
+}
+
+// 显示错误信息
+function showError(message) {
+    document.getElementById('logDetailContent').innerHTML = `
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle"></i> ${message}
+        </div>
+    `;
+}
+
+// 获取状态样式类
+function getStatusClass(status) {
+    const classes = {
+        'success': 'success',
+        'failed': 'danger',
+        'running': 'warning',
+        'killed': 'secondary',
+        'pending': 'info',
+        'skipped': 'light'
+    };
+    return classes[status] || 'secondary';
+}
+
+// 获取状态文本
+function getStatusText(status) {
+    const texts = {
+        'success': '成功',
+        'failed': '失败',
+        'running': '运行中',
+        'killed': '已终止',
+        'pending': '等待中',
+        'skipped': '跳过'
+    };
+    return texts[status] || '未知';
+}
+
+// 获取执行方式文本
+function getExecutionTypeText(type) {
+    const texts = {
+        'scheduled': '定时执行',
+        'manual': '手动执行'
+    };
+    return texts[type] || '未知';
+}
+
+// 格式化日期时间
+function formatDateTime(dateTimeStr) {
+    if (!dateTimeStr) return '-';
+    const date = new Date(dateTimeStr);
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+
+// HTML转义
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+
+{{template "footer" .}}
+{{end}}

@@ -1,0 +1,465 @@
+{{define "flow_log/list.tmpl"}}
+{{template "header" .}}
+
+<div class="page">
+  <div class="toolbar">
+    <h1 class="h1">任务流日志</h1>
+    <div class="controls">
+      <select id="statusFilter" aria-label="按状态筛选">
+        <option value="">全部状态</option>
+        <option value="running">运行中</option>
+        <option value="success">成功</option>
+        <option value="failed">失败</option>
+        <option value="killed">已终止</option>
+      </select>
+      <select id="executionTypeFilter" aria-label="按执行方式筛选">
+        <option value="">全部类型</option>
+        <option value="scheduled">调度执行</option>
+        <option value="manual">手动执行</option>
+      </select>
+      <input type="text" id="flowNameFilter" placeholder="任务流名称">
+      <input type="date" id="dateFromFilter" placeholder="开始日期">
+      <input type="date" id="dateToFilter" placeholder="结束日期">
+      <button type="button" class="btn primary" onclick="searchFlowLogs()">搜索</button>
+      <button type="button" class="btn" onclick="refreshFlowLogs()">重置</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table" id="flowLogsTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>任务流名称</th>
+          <th>状态</th>
+          <th>执行方式</th>
+          <th>开始时间</th>
+          <th>结束时间</th>
+          <th>持续时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="flowLogsTableBody">
+        <!-- 数据将通过JavaScript动态加载 -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 分页 -->
+  <div class="pagination-info" id="flowLogsInfo">
+    <!-- 分页信息 -->
+  </div>
+  <div class="pagination" id="flowLogsPagination">
+    <!-- 分页按钮 -->
+  </div>
+</div>
+
+<!-- 任务流日志详情模态框 -->
+<div class="modal" id="flowLogDetailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: white; border-radius: 8px; padding: 20px; max-width: 90%; max-height: 90%; overflow: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+            <h3 style="margin: 0;">任务流执行步骤</h3>
+            <button type="button" class="close" onclick="closeFlowLogDetail()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="flowLogDetailContent">
+                <!-- 详情内容将通过JavaScript动态加载 -->
+            </div>
+        </div>
+        <div class="modal-footer" style="margin-top: 20px; text-align: right; border-top: 1px solid #eee; padding-top: 10px;">
+            <button type="button" class="btn" onclick="closeFlowLogDetail()">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 步骤日志详情模态框 -->
+<div class="modal" id="stepLogDetailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: white; border-radius: 8px; padding: 20px; max-width: 90%; max-height: 90%; overflow: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+            <h3 style="margin: 0;">步骤执行详情</h3>
+            <button type="button" class="close" onclick="closeStepLogDetail()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="stepLogDetailContent">
+                <!-- 详情内容将通过JavaScript动态加载 -->
+            </div>
+        </div>
+        <div class="modal-footer" style="margin-top: 20px; text-align: right; border-top: 1px solid #eee; padding-top: 10px;">
+            <button type="button" class="btn" onclick="closeStepLogDetail()">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentFlowLogPage = 1;
+let currentFlowLogPageSize = 20;
+let currentFlowLogTotal = 0;
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 设置默认日期为今天
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateFromFilter').value = today;
+    document.getElementById('dateToFilter').value = today;
+    
+    loadFlowLogs();
+    
+    // 所有筛选条件都需要手动点击搜索按钮
+    const filters = ['statusFilter', 'executionTypeFilter', 'flowNameFilter', 'dateFromFilter', 'dateToFilter'];
+    filters.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', function() {
+                // 只重置页码，不自动搜索
+                currentFlowLogPage = 1;
+            });
+        }
+    });
+});
+
+// 加载任务流日志列表
+function loadFlowLogs() {
+    const params = new URLSearchParams({
+        page: currentFlowLogPage,
+        page_size: currentFlowLogPageSize,
+        status: document.getElementById('statusFilter').value,
+        execution_type: document.getElementById('executionTypeFilter').value,
+        flow_name: document.getElementById('flowNameFilter').value,
+        date_from: document.getElementById('dateFromFilter').value,
+        date_to: document.getElementById('dateToFilter').value
+    });
+
+    fetch(`/api/flow-logs?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderFlowLogsTable(data.data.logs || []);
+                renderFlowLogsPagination(data.data);
+            } else {
+                alert('加载任务流日志失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('加载任务流日志失败');
+        });
+}
+
+// 渲染任务流日志表格
+function renderFlowLogsTable(logs) {
+    const tbody = document.getElementById('flowLogsTableBody');
+    tbody.innerHTML = '';
+
+    if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center">暂无数据</td></tr>';
+        return;
+    }
+
+    logs.forEach(log => {
+        const statusBadge = getStatusBadge(log.status);
+        const executionTypeBadge = getExecutionTypeBadge(log.execution_type);
+        const startTime = formatDateTime(log.start_time);
+        const endTime = log.end_time ? formatDateTime(log.end_time) : '-';
+        const duration = log.duration || '-';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${log.id}</td>
+            <td>${log.flow_name || '未知任务流'}</td>
+            <td>${statusBadge}</td>
+            <td>${executionTypeBadge}</td>
+            <td>${startTime}</td>
+            <td>${endTime}</td>
+            <td>${duration}</td>
+            <td>
+                <button class="btn" onclick="viewFlowLogDetail(${log.id})">详情</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// 渲染分页
+function renderFlowLogsPagination(data) {
+    currentFlowLogTotal = data.total;
+    const totalPages = data.total_pages;
+    
+    // 更新分页信息
+    const start = (data.page - 1) * data.page_size + 1;
+    const end = Math.min(data.page * data.page_size, data.total);
+    document.getElementById('flowLogsInfo').textContent = `显示第 ${start} 到 ${end} 条，共 ${data.total} 条记录`;
+
+    // 渲染分页按钮
+    const pagination = document.getElementById('flowLogsPagination');
+    pagination.innerHTML = '';
+
+    if (totalPages <= 1) return;
+
+    // 上一页
+    const prevDisabled = data.page <= 1 ? 'disabled' : '';
+    const prevLink = document.createElement('a');
+    prevLink.className = `paginate_button previous ${prevDisabled}`;
+    prevLink.textContent = '上一页';
+    prevLink.onclick = () => changeFlowLogPage(data.page - 1);
+    pagination.appendChild(prevLink);
+
+    // 页码
+    const startPage = Math.max(1, data.page - 2);
+    const endPage = Math.min(totalPages, data.page + 2);
+
+    for (let i = startPage; i <= endPage; i++) {
+        const active = i === data.page ? 'current' : '';
+        const pageLink = document.createElement('a');
+        pageLink.className = `paginate_button ${active}`;
+        pageLink.textContent = i;
+        pageLink.onclick = () => changeFlowLogPage(i);
+        pagination.appendChild(pageLink);
+    }
+
+    // 下一页
+    const nextDisabled = data.page >= totalPages ? 'disabled' : '';
+    const nextLink = document.createElement('a');
+    nextLink.className = `paginate_button next ${nextDisabled}`;
+    nextLink.textContent = '下一页';
+    nextLink.onclick = () => changeFlowLogPage(data.page + 1);
+    pagination.appendChild(nextLink);
+}
+
+// 切换页面
+function changeFlowLogPage(page) {
+    if (page < 1 || page > Math.ceil(currentFlowLogTotal / currentFlowLogPageSize)) return;
+    currentFlowLogPage = page;
+    loadFlowLogs();
+}
+
+// 搜索任务流日志
+function searchFlowLogs() {
+    currentFlowLogPage = 1;
+    loadFlowLogs();
+}
+
+// 重置任务流日志筛选条件
+function refreshFlowLogs() {
+    // 重置所有筛选条件
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('executionTypeFilter').value = '';
+    document.getElementById('flowNameFilter').value = '';
+    
+    // 重置日期为今天
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateFromFilter').value = today;
+    document.getElementById('dateToFilter').value = today;
+    
+    // 重置页码并加载数据
+    currentFlowLogPage = 1;
+    loadFlowLogs();
+}
+
+// 查看任务流日志详情
+function viewFlowLogDetail(executionId) {
+    fetch(`/api/flow-logs/${executionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderFlowLogDetail(data.data);
+                document.getElementById('flowLogDetailModal').style.display = 'flex';
+            } else {
+                alert('获取任务流日志详情失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取任务流日志详情失败');
+        });
+}
+
+// 关闭任务流日志详情模态框
+function closeFlowLogDetail() {
+    document.getElementById('flowLogDetailModal').style.display = 'none';
+}
+
+// 查看步骤日志详情
+function viewStepLogDetail(stepId) {
+    fetch(`/api/task-logs/${stepId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderStepLogDetail(data.data);
+                document.getElementById('stepLogDetailModal').style.display = 'flex';
+            } else {
+                alert('获取步骤日志详情失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取步骤日志详情失败');
+        });
+}
+
+// 关闭步骤日志详情模态框
+function closeStepLogDetail() {
+    document.getElementById('stepLogDetailModal').style.display = 'none';
+}
+
+// 渲染步骤日志详情
+function renderStepLogDetail(step) {
+    const logContent = step.log_content ? 
+        `<pre class="bg-light p-3 logs-container" style="max-height: 400px; overflow-y: auto;">${escapeHtml(step.log_content)}</pre>` : 
+        '<p class="text-muted">暂无日志内容</p>';
+
+    const content = `
+        <div class="card">
+            <div class="card-header">
+                <h5>步骤信息</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>步骤:</strong> ${step.step_order}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>任务:</strong> ${step.task_name}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>状态:</strong> ${getStatusBadge(step.status)}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>步骤ID:</strong> ${step.id}
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-3">
+                        <strong>开始时间:</strong> ${step.start_time ? formatDateTime(step.start_time) : '-'}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>结束时间:</strong> ${step.end_time ? formatDateTime(step.end_time) : '-'}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>持续时间:</strong> ${step.duration || '-'}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>执行日志</h5>
+            </div>
+            <div class="card-body">
+                ${logContent}
+            </div>
+        </div>
+    `;
+
+    document.getElementById('stepLogDetailContent').innerHTML = content;
+}
+
+// 渲染任务流日志详情
+function renderFlowLogDetail(data) {
+    const steps = data.steps;
+
+    let stepsHtml = '';
+    if (steps && steps.length > 0) {
+        stepsHtml = `
+            <div class="card">
+                <div class="card-header">
+                    <h5>执行步骤</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>步骤</th>
+                                    <th>任务名称</th>
+                                    <th>状态</th>
+                                    <th>开始时间</th>
+                                    <th>结束时间</th>
+                                    <th>持续时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+        `;
+
+        steps.forEach(step => {
+            const statusBadge = getStatusBadge(step.status);
+            const startTime = step.start_time ? formatDateTime(step.start_time) : '-';
+            const endTime = step.end_time ? formatDateTime(step.end_time) : '-';
+            const duration = step.duration || '-';
+
+            stepsHtml += `
+                <tr>
+                    <td>${step.step_order}</td>
+                    <td>${step.task_name || '未知任务'}</td>
+                    <td>${statusBadge}</td>
+                    <td>${startTime}</td>
+                    <td>${endTime}</td>
+                    <td>${duration}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info" onclick="viewStepLogDetail(${step.id})">
+                            <i class="fas fa-eye"></i> 日志详情
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        stepsHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        stepsHtml = `
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted text-center">暂无执行步骤</p>
+                </div>
+            </div>
+        `;
+    }
+
+    document.getElementById('flowLogDetailContent').innerHTML = stepsHtml;
+}
+
+// 获取状态徽章
+function getStatusBadge(status) {
+    const badges = {
+        'running': '<span class="badge badge-warning">运行中</span>',
+        'success': '<span class="badge badge-success">成功</span>',
+        'failed': '<span class="badge badge-danger">失败</span>',
+        'killed': '<span class="badge badge-secondary">已终止</span>'
+    };
+    return badges[status] || '<span class="badge badge-secondary">未知</span>';
+}
+
+// 获取执行方式徽章
+function getExecutionTypeBadge(type) {
+    const badges = {
+        'scheduled': '<span class="badge badge-primary">调度执行</span>',
+        'manual': '<span class="badge badge-info">手动执行</span>'
+    };
+    return badges[type] || '<span class="badge badge-secondary">未知</span>';
+}
+
+// 格式化日期时间
+function formatDateTime(dateTimeStr) {
+    if (!dateTimeStr) return '-';
+    const date = new Date(dateTimeStr);
+    return date.toLocaleString('zh-CN');
+}
+
+// HTML转义
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+
+{{template "footer" .}}
+{{end}}
+

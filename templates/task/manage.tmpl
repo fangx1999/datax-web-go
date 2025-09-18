@@ -1,0 +1,185 @@
+{{define "task/manage.tmpl"}}
+{{template "header" .}}
+
+<div class="page">
+  <div class="toolbar">
+    <h1 class="h1">任务管理</h1>
+    <div class="controls">
+      <a class="btn" href="/tasks">← 返回列表</a>
+    </div>
+  </div>
+
+  <!-- 任务信息卡片 -->
+  <div class="card">
+    <div class="card-header">
+      <h3>任务信息</h3>
+    </div>
+    <div class="task-info">
+      <div class="info-row">
+        <div class="info-label">任务ID</div>
+        <div class="info-value">{{.Task.ID}}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">任务名称</div>
+        <div class="info-value">{{.Task.Name}}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">数据源</div>
+        <div class="info-value">
+          <span class="data-source-flow-inline">
+            <span class="source-inline">{{.Task.Source}}</span>
+            <span class="arrow-inline">→</span>
+            <span class="target-inline">{{.Task.Target}}</span>
+          </span>
+        </div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">创建时间</div>
+        <div class="info-value">{{.Task.CreatedAt.Format "2006-01-02 15:04:05"}}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-label">更新时间</div>
+        <div class="info-value">{{.Task.UpdatedAt.Format "2006-01-02 15:04:05"}}</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- JSON配置卡片 -->
+  <div class="card">
+    <div class="card-header">
+      <h3>DataX JSON 配置</h3>
+      <div class="card-actions">
+        <button id="editJsonBtn" class="btn" onclick="toggleJsonEdit()">
+          <span class="btn-icon">✏</span>
+          编辑
+        </button>
+      </div>
+    </div>
+    <div class="json-container">
+      <pre class="json" id="jsonDisplay">{{.Task.JsonConfig}}</pre>
+      <div class="json-edit hidden" id="jsonEdit">
+        <div class="json-edit-header">
+          <span class="json-edit-tip">💡 提示：使用 Ctrl+S 保存，Esc 取消编辑</span>
+        </div>
+        <textarea id="jsonTextarea" class="json-textarea" rows="20" placeholder="请输入有效的JSON配置...">{{.Task.JsonConfig}}</textarea>
+        <div class="json-edit-actions">
+          <button class="btn primary" onclick="saveJson()">
+            <span class="btn-icon">💾</span>
+            保存
+          </button>
+          <button class="btn" onclick="cancelJsonEdit()">
+            <span class="btn-icon">❌</span>
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JSON编辑表单（隐藏） -->
+  <form id="jsonEditForm" method="post" action="/tasks/{{.Task.ID}}" style="display:none">
+    <input type="hidden" name="datax_json" id="hiddenJsonConfig">
+  </form>
+
+</div>
+
+<script>
+let isJsonEditing = false;
+
+function toggleJsonEdit() {
+  const editBtn = document.getElementById('editJsonBtn');
+  const jsonDisplay = document.getElementById('jsonDisplay');
+  const jsonEdit = document.getElementById('jsonEdit');
+  const jsonTextarea = document.getElementById('jsonTextarea');
+  
+  if (!isJsonEditing) {
+    // 进入编辑模式
+    editBtn.classList.add('hidden'); // 隐藏右上角按钮
+    jsonDisplay.classList.add('hidden');
+    jsonEdit.classList.remove('hidden');
+    
+    // 设置textarea的值
+    jsonTextarea.value = jsonDisplay.textContent;
+    
+    // 自动聚焦并选中所有文本
+    jsonTextarea.focus();
+    jsonTextarea.select();
+    
+    isJsonEditing = true;
+  } else {
+    // 取消编辑
+    cancelJsonEdit();
+  }
+}
+
+function saveJson() {
+  const jsonTextarea = document.getElementById('jsonTextarea');
+  const jsonValue = jsonTextarea.value.trim();
+  
+  // 设置隐藏表单的值
+  document.getElementById('hiddenJsonConfig').value = jsonValue;
+  
+  // 使用统一的校验函数
+  const errors = validateForm(document.getElementById('jsonEditForm'), {
+    datax_json: {
+      required: true,
+      minLength: 1,
+      label: 'DataX配置'
+    }
+  });
+  
+  if (errors.length > 0) {
+    showFormErrors(errors, document.getElementById('jsonEditForm'));
+    return;
+  }
+  
+  // JSON格式验证
+  try {
+    JSON.parse(jsonValue);
+  } catch (e) {
+    alert('JSON格式不正确，请检查后重试：\n' + e.message);
+    return;
+  }
+  
+  // 提交表单
+  document.getElementById('jsonEditForm').submit();
+}
+
+function cancelJsonEdit() {
+  const editBtn = document.getElementById('editJsonBtn');
+  const jsonDisplay = document.getElementById('jsonDisplay');
+  const jsonEdit = document.getElementById('jsonEdit');
+  const jsonTextarea = document.getElementById('jsonTextarea');
+  
+  // 恢复原始值
+  jsonTextarea.value = jsonDisplay.textContent;
+  
+  // 退出编辑模式
+  editBtn.classList.remove('hidden'); // 重新显示右上角按钮
+  editBtn.innerHTML = '<span class="btn-icon">✏</span>编辑';
+  editBtn.className = 'btn';
+  jsonDisplay.classList.remove('hidden');
+  jsonEdit.classList.add('hidden');
+  isJsonEditing = false;
+}
+
+// 添加键盘快捷键支持
+document.addEventListener('keydown', function(e) {
+  if (isJsonEditing) {
+    // Ctrl+S 保存
+    if (e.ctrlKey && e.key === 's') {
+      e.preventDefault();
+      saveJson();
+    }
+    // Esc 取消
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelJsonEdit();
+    }
+  }
+});
+</script>
+
+{{template "footer" .}}
+{{end}}

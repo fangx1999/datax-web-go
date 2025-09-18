@@ -1,0 +1,112 @@
+{{define "user/list.tmpl"}}
+{{template "header" .}}
+
+
+<div class="page">
+    <div class="toolbar">
+        <h1 class="h1">用户管理</h1>
+        <div class="controls">
+            <input id="uq" type="search" placeholder="搜索用户名或ID…">
+            <select id="roleFilter" aria-label="按角色筛选">
+                <option value="">全部角色</option>
+                <option value="admin">管理员</option>
+                <option value="user">普通用户</option>
+            </select>
+            <a class="btn primary" href="/admin/users/new">➕ 新建用户</a>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table" id="userTable">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>用户名</th>
+                <th>角色</th>
+                <th>创建人</th>
+                <th>最后操作人</th>
+                <th>创建时间</th>
+                <th>状态</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {{if .Users}}
+            {{range .Users}}
+            <tr
+                    data-id="{{.ID}}"
+                    data-name="{{.Username}}"
+                    data-role="{{.Role}}"
+                    data-disabled="{{if .Disabled}}1{{else}}0{{end}}"
+            >
+                <td>{{.ID}}</td>
+                <td>{{.Username}}</td>
+                <td><span class="badge">{{.Role}}</span></td>
+                <td>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</td>
+                <td>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</td>
+                <td>{{.CreatedAt.Format "2006-01-02 15:04:06"}}</td>
+
+                <!-- 状态格：加 data-status，方便脚本替换内容 -->
+                <td data-status>
+                    {{if .Disabled}}<span class="badge">DISABLED</span>{{else}}<span class="badge">ACTIVE</span>{{end}}
+                </td>
+
+                <td class="actions">
+                    <!-- ✅ 合并为一个"切换"按钮（无刷新） -->
+                    <button
+                            class="linklike"
+                            data-toggle-user="{{.ID}}"
+                            data-current="{{if .Disabled}}1{{else}}0{{end}}"
+                            title="启用/禁用"
+                    >
+                        {{if .Disabled}}启用{{else}}禁用{{end}}
+                    </button>
+                </td>
+            </tr>
+            {{end}}
+            {{end}}
+            <!-- 永久空状态行，由前端控制显隐 -->
+            <tr data-empty style="display:none">
+                <td class="empty" colspan="8">暂无用户</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // 初始化表格筛选
+  createTableFilter('userTable', 'uq', 'roleFilter', {
+    searchFields: ['name', 'id'],
+    filterField: 'role',
+    emptyText: '暂无用户'
+  });
+
+  // 使用通用切换处理器
+  createToggleHandler('[data-toggle-user]', '/admin/users/{id}/toggle', {
+    enableText: '禁用',
+    disableText: '启用',
+    updateUI: function(button, newState) {
+      const tr = button.closest('tr');
+      const statusCell = tr ? tr.querySelector('[data-status]') : null;
+      
+      if (tr) tr.setAttribute('data-disabled', newState);
+      if (statusCell) {
+        statusCell.innerHTML = newState === '1'
+          ? '<span class="badge">DISABLED</span>'
+          : '<span class="badge">ACTIVE</span>';
+      }
+    },
+    refreshFilter: function() {
+      // 重新应用筛选
+      if (window.applyUserFilter) {
+        window.applyUserFilter();
+      }
+    }
+  });
+});
+</script>
+
+{{template "footer" .}}
+{{end}}

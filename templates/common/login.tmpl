@@ -1,0 +1,32 @@
+{{define "login.tmpl"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - DataX-Web-Go</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="auth">
+    <div class="auth-card">
+        <h2>DataX-Web-UI</h2>
+        {{if .Error}}
+        <div class="alert">{{.Error}}</div>
+        {{end}}
+        <form method="post" action="/login">
+            <div class="field">
+                <label for="username">用户名</label>
+                <input type="text" id="username" name="username" placeholder="admin" required>
+            </div>
+            <div class="field">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" placeholder="请输入密码" required>
+            </div>
+            <button type="submit" class="btn primary">登录</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>
+{{end}}
