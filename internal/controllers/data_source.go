@@ -113,12 +113,24 @@ func (ct *Controller) DSUpdate(c *gin.Context) {
 	uid := ct.GetCurrentUserID(c)
 	fields := ct.getDSFields(c, typ)
 
+	var err error
 	if typ == DSTypeMySQL {
-		query := `UPDATE data_sources SET name=?,db_url=?,db_user=?,db_password=?,db_database=?,updated_by=? WHERE id=?`
-		ct.db.Exec(query, name, fields.DBURL, fields.DBUser, fields.DBPassword, fields.DBDatabase, uid, id)
+		// 如果密码为空，则不更新密码字段
+		if fields.DBPassword == "" {
+			query := `UPDATE data_sources SET name=?,db_url=?,db_user=?,db_database=?,updated_by=? WHERE id=?`
+			_, err = ct.db.Exec(query, name, fields.DBURL, fields.DBUser, fields.DBDatabase, uid, id)
+		} else {
+			query := `UPDATE data_sources SET name=?,db_url=?,db_user=?,db_password=?,db_database=?,updated_by=? WHERE id=?`
+			_, err = ct.db.Exec(query, name, fields.DBURL, fields.DBUser, fields.DBPassword, fields.DBDatabase, uid, id)
+		}
 	} else {
 		query := `UPDATE data_sources SET name=?,defaultfs=?,hadoopconfig=?,updated_by=? WHERE id=?`
-		ct.db.Exec(query, name, fields.DefaultFS, fields.HadoopConfig, uid, id)
+		_, err = ct.db.Exec(query, name, fields.DefaultFS, fields.HadoopConfig, uid, id)
+	}
+
+	if err != nil {
+		c.String(500, "更新数据源失败: "+err.Error())
+		return
 	}
 
 	c.Redirect(302, "/data-sources")

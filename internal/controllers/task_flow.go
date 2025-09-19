@@ -47,7 +47,7 @@ func (ct *Controller) TaskFlowNewForm(c *gin.Context) {
 func (ct *Controller) TaskFlowCreate(c *gin.Context) {
 	name := strings.TrimSpace(c.PostForm("name"))
 	description := strings.TrimSpace(c.PostForm("description"))
-	cronExpr := strings.TrimSpace(c.PostForm("cron"))
+	cronExpr := strings.TrimSpace(c.PostForm("cron_expr"))
 
 	// 创建人
 	uid := ct.GetCurrentUserID(c)
@@ -89,7 +89,7 @@ func (ct *Controller) TaskFlowProperties(c *gin.Context) {
 	}
 
 	c.HTML(200, "taskflow/form.tmpl", gin.H{
-		"FlowID": id, "Name": name, "Description": description, "Cron": cronExpr, "IsEdit": true,
+		"FlowID": id, "Name": name, "Description": description, "CronExpr": cronExpr, "IsEdit": true,
 	})
 }
 
@@ -97,8 +97,9 @@ func (ct *Controller) TaskFlowProperties(c *gin.Context) {
 func (ct *Controller) TaskFlowFlow(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	// 获取任务流详情
-	var name string
-	err := ct.db.QueryRow("SELECT name FROM task_flows WHERE id=?", id).Scan(&name)
+	var name, cronExpr string
+	var enabled bool
+	err := ct.db.QueryRow("SELECT name, cron_expr, enabled FROM task_flows WHERE id=?", id).Scan(&name, &cronExpr, &enabled)
 	if err != nil {
 		c.String(404, "任务流不存在")
 		return
@@ -138,7 +139,7 @@ func (ct *Controller) TaskFlowFlow(c *gin.Context) {
 	}
 
 	c.HTML(200, "taskflow/flow.tmpl", gin.H{
-		"FlowID": id, "Name": name, "Steps": steps, "AvailableTasks": availableTasks,
+		"FlowID": id, "Name": name, "CronExpr": cronExpr, "Enabled": enabled, "Steps": steps, "AvailableTasks": availableTasks,
 	})
 }
 
@@ -182,14 +183,39 @@ func (ct *Controller) TaskFlowRunNow(c *gin.Context) {
 // TaskFlowToggle 切换任务流的启用状态
 func (ct *Controller) TaskFlowToggle(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-	ct.db.Exec("UPDATE task_flows SET enabled=1-enabled WHERE id=?", id)
+
+	// 检查任务流是否存在
+	var exists bool
+	err := ct.db.QueryRow("SELECT EXISTS(SELECT 1 FROM task_flows WHERE id=?)", id).Scan(&exists)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "查询任务流失败: " + err.Error()})
+		return
+	}
+	if !exists {
+		c.JSON(404, gin.H{"error": "任务流不存在"})
+		return
+	}
+
+	// 更新启用状态
+	result, err := ct.db.Exec("UPDATE task_flows SET enabled=1-enabled WHERE id=?", id)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "更新任务流状态失败: " + err.Error()})
+		return
+	}
+
+	// 检查是否真的更新了
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		c.JSON(404, gin.H{"error": "任务流不存在"})
+		return
+	}
 
 	// 在调度器中重新加载任务流以应用启用/禁用更改
 	if err := ct.sched.ReloadTaskFlow(id); err != nil {
 		log.Printf("Failed to reload task flow %d in scheduler: %v", id, err)
 	}
 
-	c.Redirect(302, "/task-flows")
+	c.JSON(200, gin.H{"message": "状态更新成功"})
 }
 
 // TaskFlowKill 取消正在运行的任务流
@@ -206,7 +232,7 @@ func (ct *Controller) TaskFlowKill(c *gin.Context) {
 func (ct *Controller) TaskFlowUpdate(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	description := strings.TrimSpace(c.PostForm("description"))
-	cronExpr := strings.TrimSpace(c.PostForm("cron"))
+	cronExpr := strings.TrimSpace(c.PostForm("cron_expr"))
 
 	// 获取当前用户ID
 	uid := ct.GetCurrentUserID(c)
@@ -343,13 +369,21 @@ func (ct *Controller) TaskFlowRemoveStep(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "步骤删除成功"})
+	c.JSON(200, gin.H{"message": "步骤删除成功", "redirect": fmt.Sprintf("/task-flows/%d/flow", flowID)})
 }
 
 // TaskFlowReorderSteps 更新步骤顺序
 func (ct *Controller) TaskFlowReorderSteps(c *gin.Context) {
 	flowID, _ := strconv.Atoi(c.Param("id"))
-	stepOrders := c.PostFormArray("step_order")
+
+	// 支持两种参数格式：step_order[] 和 step_orders[0], step_orders[1]...
+	var stepOrders []string
+	if c.PostForm("step_order") != "" {
+		stepOrders = c.PostFormArray("step_order")
+	} else {
+		// 处理 step_orders[0], step_orders[1] 格式
+		stepOrders = c.PostFormArray("step_orders[]")
+	}
 
 	if len(stepOrders) == 0 {
 		c.String(400, "没有提供步骤顺序")

@@ -1,111 +1,200 @@
 {{define "user/list.tmpl"}}
 {{template "header" .}}
+{{template "common/confirm_modal.tmpl" .}}
+{{template "common/alert.tmpl" .}}
 
+<div>
+  <!-- 页面标题和工具栏 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+      <i class="bi bi-people me-2"></i>用户管理
+    </h1>
+    <a href="/admin/users/new" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>新建用户
+    </a>
+  </div>
 
-<div class="page">
-    <div class="toolbar">
-        <h1 class="h1">用户管理</h1>
-        <div class="controls">
-            <input id="uq" type="search" placeholder="搜索用户名或ID…">
-            <select id="roleFilter" aria-label="按角色筛选">
-                <option value="">全部角色</option>
-                <option value="admin">管理员</option>
-                <option value="user">普通用户</option>
-            </select>
-            <a class="btn primary" href="/admin/users/new">➕ 新建用户</a>
-        </div>
-    </div>
+  <!-- 搜索和过滤 -->
+  {{template "table_filter" .}}
 
-    <div class="table-wrap">
-        <table class="table" id="userTable">
-            <thead>
+  <!-- 用户列表 -->
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0" id="userTable">
+          <thead class="table-light">
             <tr>
-                <th>ID</th>
-                <th>用户名</th>
-                <th>角色</th>
-                <th>创建人</th>
-                <th>最后操作人</th>
-                <th>创建时间</th>
-                <th>状态</th>
-                <th>操作</th>
+              <th width="8%">ID</th>
+              <th width="22%">用户名</th>
+              <th width="12%">角色</th>
+              <th width="16%">创建人</th>
+              <th width="16%">最后操作人</th>
+              <th width="18%">创建时间</th>
+              <th width="8%">状态</th>
+              <th style="width: auto; min-width: 120px;">操作</th>
             </tr>
-            </thead>
-            <tbody>
+          </thead>
+          <tbody>
             {{if .Users}}
             {{range .Users}}
-            <tr
-                    data-id="{{.ID}}"
-                    data-name="{{.Username}}"
-                    data-role="{{.Role}}"
-                    data-disabled="{{if .Disabled}}1{{else}}0{{end}}"
-            >
-                <td>{{.ID}}</td>
-                <td>{{.Username}}</td>
-                <td><span class="badge">{{.Role}}</span></td>
-                <td>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</td>
-                <td>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</td>
-                <td>{{.CreatedAt.Format "2006-01-02 15:04:06"}}</td>
-
-                <!-- 状态格：加 data-status，方便脚本替换内容 -->
-                <td data-status>
-                    {{if .Disabled}}<span class="badge">DISABLED</span>{{else}}<span class="badge">ACTIVE</span>{{end}}
-                </td>
-
-                <td class="actions">
-                    <!-- ✅ 合并为一个"切换"按钮（无刷新） -->
-                    <button
-                            class="linklike"
-                            data-toggle-user="{{.ID}}"
-                            data-current="{{if .Disabled}}1{{else}}0{{end}}"
-                            title="启用/禁用"
-                    >
-                        {{if .Disabled}}启用{{else}}禁用{{end}}
-                    </button>
-                </td>
+            <tr data-id="{{.ID}}" 
+                data-name="{{.Username}}" 
+                data-role="{{.Role}}"
+                data-disabled="{{if .Disabled}}1{{else}}0{{end}}">
+              <td class="fw-semibold">{{.ID}}</td>
+              <td>
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-person-circle me-2 text-muted"></i>
+                  <span class="fw-medium">{{.Username}}</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge bg-{{if eq .Role "admin"}}danger{{else}}primary{{end}}">
+                  {{if eq .Role "admin"}}管理员{{else}}普通用户{{end}}
+                </span>
+              </td>
+              <td>
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-person me-1 text-muted"></i>
+                  <span>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</span>
+                </div>
+              </td>
+              <td>
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-person me-1 text-muted"></i>
+                  <span>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</span>
+                </div>
+              </td>
+              <td>
+                <small class="text-muted">{{.CreatedAt.Format "2006-01-02 15:04:06"}}</small>
+              </td>
+              <td>
+                {{if .Disabled}}
+                  <span class="badge bg-secondary">已禁用</span>
+                {{else}}
+                  <span class="badge bg-success">正常</span>
+                {{end}}
+              </td>
+              <td>
+                <button type="button" 
+                        class="btn btn-outline-{{if .Disabled}}success{{else}}warning{{end}} btn-sm" 
+                        onclick="toggleUser({{.ID}}, '{{.Username}}', {{if .Disabled}}true{{else}}false{{end}})"
+                        title="{{if .Disabled}}启用{{else}}禁用{{end}}用户">
+                  <i class="bi bi-{{if .Disabled}}play-circle{{else}}pause-circle{{end}} me-1"></i>{{if .Disabled}}启用{{else}}禁用{{end}}
+                </button>
+              </td>
             </tr>
             {{end}}
-            {{end}}
-            <!-- 永久空状态行，由前端控制显隐 -->
-            <tr data-empty style="display:none">
-                <td class="empty" colspan="8">暂无用户</td>
+            {{else}}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-5">
+                <i class="bi bi-inbox display-4 d-block mb-3"></i>
+                <h5>暂无用户</h5>
+                <p class="mb-0">点击"新建用户"开始添加用户</p>
+              </td>
             </tr>
-            </tbody>
+            {{end}}
+          </tbody>
         </table>
+      </div>
     </div>
+  </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  // 初始化表格筛选
-  createTableFilter('userTable', 'uq', 'roleFilter', {
-    searchFields: ['name', 'id'],
-    filterField: 'role',
-    emptyText: '暂无用户'
-  });
 
-  // 使用通用切换处理器
-  createToggleHandler('[data-toggle-user]', '/admin/users/{id}/toggle', {
-    enableText: '禁用',
-    disableText: '启用',
-    updateUI: function(button, newState) {
-      const tr = button.closest('tr');
-      const statusCell = tr ? tr.querySelector('[data-status]') : null;
+<script>
+// 初始化表格过滤
+document.addEventListener('DOMContentLoaded', function() {
+  // 配置过滤选项
+  const filterSelect = document.getElementById('filterSelect');
+  const searchInput = document.getElementById('searchInput');
+  
+  // 设置搜索框占位符
+  searchInput.placeholder = '搜索用户名';
+  
+  // 设置过滤选项
+  filterSelect.innerHTML = `
+    <option value="">全部角色</option>
+    <option value="admin">管理员</option>
+    <option value="user">普通用户</option>
+  `;
+  
+  // 使用通用过滤组件
+  initTableFilter({
+    tableId: 'userTable',
+    searchColumns: [1], // 只搜索用户名
+    filterColumn: null, // 不使用默认的角色列过滤
+    customFilter: function(row, searchTerm, filterValue) {
+      // 搜索过滤
+      let matchesSearch = true;
+      if (searchTerm) {
+        const username = row.cells[1].textContent.toLowerCase();
+        matchesSearch = username.includes(searchTerm.toLowerCase());
+      }
       
-      if (tr) tr.setAttribute('data-disabled', newState);
-      if (statusCell) {
-        statusCell.innerHTML = newState === '1'
-          ? '<span class="badge">DISABLED</span>'
-          : '<span class="badge">ACTIVE</span>';
+      // 角色过滤
+      let matchesFilter = true;
+      if (filterValue) {
+        const role = row.getAttribute('data-role');
+        matchesFilter = role === filterValue;
       }
-    },
-    refreshFilter: function() {
-      // 重新应用筛选
-      if (window.applyUserFilter) {
-        window.applyUserFilter();
-      }
+      
+      return matchesSearch && matchesFilter;
     }
   });
 });
+
+// 切换用户状态（禁用/启用）
+function toggleUser(userId, username, isDisabled) {
+  const warningText = isDisabled 
+    ? '启用后用户将可以正常登录和使用系统。'
+    : '禁用后用户将无法登录系统，但数据会被保留。';
+  
+  showToggleConfirm(
+    `用户 ${username}`, 
+    `/admin/users/${userId}/toggle`, 
+    isDisabled, 
+    function() {
+      // 立即关闭模态框
+      const modal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+      if (modal) {
+        modal.hide();
+      }
+      
+      // 发送AJAX请求
+      const actionText = isDisabled ? '启用' : '禁用';
+      fetch(`/admin/users/${userId}/toggle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `_method=POST`
+      })
+      .then(response => {
+        if (response.ok) {
+          // HTTP 2xx 状态码表示成功
+          return response.json().then(data => {
+            showAlert(data.message || `${actionText}用户成功`, 'success');
+            setTimeout(() => {
+              location.reload();
+            }, 1000); // 1秒后刷新页面
+          });
+        } else {
+          // HTTP 4xx/5xx 状态码表示失败
+          return response.json().then(data => {
+            showAlert(data.error || `${actionText}用户失败，请重试`, 'danger');
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        showAlert(`${actionText}用户失败，请重试`, 'danger');
+      });
+    },
+    warningText
+  );
+}
+
 </script>
 
 {{template "footer" .}}

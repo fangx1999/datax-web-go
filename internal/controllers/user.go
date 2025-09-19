@@ -53,15 +53,38 @@ func (ct *Controller) UserCreate(c *gin.Context) {
 
 // UserToggle 切换用户启用/禁用状态
 func (ct *Controller) UserToggle(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-
-	// 获取当前用户ID
-	updatedBy := ct.GetCurrentUserID(c)
-	_, err := ct.db.Exec("UPDATE users SET disabled=1-disabled, updated_by=? WHERE id=?", updatedBy, id)
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(500, gin.H{"success": false, "error": "更新用户状态失败"})
+		c.JSON(400, gin.H{"error": "无效的用户ID"})
 		return
 	}
 
-	c.JSON(200, gin.H{"success": true, "message": "用户状态更新成功"})
+	// 检查用户是否存在
+	var exists bool
+	err = ct.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id=?)", id).Scan(&exists)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "查询用户失败"})
+		return
+	}
+	if !exists {
+		c.JSON(404, gin.H{"error": "用户不存在"})
+		return
+	}
+
+	// 获取当前用户ID
+	updatedBy := ct.GetCurrentUserID(c)
+	result, err := ct.db.Exec("UPDATE users SET disabled=1-disabled, updated_by=? WHERE id=?", updatedBy, id)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "更新用户状态失败"})
+		return
+	}
+
+	// 检查是否真的更新了记录
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		c.JSON(400, gin.H{"error": "用户状态未发生变化"})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "用户状态更新成功"})
 }

@@ -1,98 +1,174 @@
 {{define "task/list.tmpl"}}
 {{template "header" .}}
+{{template "common/confirm_modal.tmpl" .}}
+{{template "common/alert.tmpl" .}}
 
-<div class="page">
-  <div class="toolbar">
-    <h1 class="h1">任务管理</h1>
-    <div class="controls">
-      <input id="q" type="search" placeholder="搜索任务名称或ID…">
-      <select id="flowFilter" aria-label="按任务流筛选">
-        <option value="">全部任务流</option>
-        <option value="unassigned">未分配</option>
-      </select>
-      <a class="btn primary" href="/tasks/new">➕ 新建任务</a>
-    </div>
+<div>
+  <!-- 页面标题和工具栏 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+      <i class="bi bi-list-task me-2"></i>任务管理
+    </h1>
+    <a href="/tasks/new" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>新建任务
+    </a>
   </div>
 
-  <div class="table-wrap">
-    <table class="table" id="taskTable">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>名称</th>
-          <th>所属任务流</th>
-          <th>创建人</th>
-          <th>最后操作人</th>
-          <th>创建时间</th>
-          <th>更新时间</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-      {{if .Tasks}}
-      {{range .Tasks}}
-        <tr data-id="{{.ID}}" data-name="{{.Name}}" data-flow="{{.FlowName}}">
-          <td>{{.ID}}</td>
-          <td>{{.Name}}</td>
-          <td>
-            {{if .FlowID}}
-              {{.FlowName}}
-            {{else}}
-              <span class="text-muted">未分配</span>
+  <!-- 搜索和过滤 -->
+  {{template "table_filter" .}}
+
+  <!-- 任务列表 -->
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0" id="taskTable">
+          <thead class="table-light">
+            <tr>
+              <th width="6%">ID</th>
+              <th width="20%">名称</th>
+              <th width="16%">所属任务流</th>
+              <th width="10%">创建人</th>
+              <th width="10%">最后操作人</th>
+              <th width="12%">创建时间</th>
+              <th width="12%">更新时间</th>
+              <th width="22%">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{if .Tasks}}
+            {{range .Tasks}}
+            <tr data-id="{{.ID}}" 
+                data-name="{{.Name}}" 
+                data-flow="{{if .FlowName}}{{.FlowName}}{{else}}未分配{{end}}">
+              <td class="fw-semibold">{{.ID}}</td>
+              <td>
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-file-earmark-text me-2 text-muted"></i>
+                  <span class="fw-medium">{{.Name}}</span>
+                </div>
+              </td>
+              <td>
+                {{if .FlowName}}
+                  <span class="badge bg-primary">{{.FlowName}}</span>
+                {{else}}
+                  <span class="badge bg-secondary">未分配</span>
+                {{end}}
+              </td>
+              <td>
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-person me-1 text-muted"></i>
+                  <span>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</span>
+                </div>
+              </td>
+              <td>
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-person me-1 text-muted"></i>
+                  <span>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</span>
+                </div>
+              </td>
+              <td>
+                <small class="text-muted">{{.CreatedAt.Format "2006-01-02 15:04:06"}}</small>
+              </td>
+              <td>
+                <small class="text-muted">{{.UpdatedAt.Format "2006-01-02 15:04:06"}}</small>
+              </td>
+              <td>
+                <div class="btn-group btn-group-sm" role="group">
+                  <a href="/tasks/{{.ID}}" 
+                     class="btn btn-outline-primary btn-sm" 
+                     title="管理任务">
+                    <i class="bi bi-gear me-1"></i>管理
+                  </a>
+                  <button type="button" 
+                          class="btn btn-outline-success btn-sm" 
+                          title="立即执行"
+                          onclick="showRunConfirm('任务 \'{{.Name}}\'', '/tasks/{{.ID}}/run', null, '任务将立即执行，请确保数据源连接正常。')">
+                    <i class="bi bi-play me-1"></i>执行
+                  </button>
+                  <button type="button" 
+                          class="btn btn-outline-danger btn-sm" 
+                          title="删除任务"
+                          onclick="showDeleteConfirm('任务 \'{{.Name}}\'', '/tasks/{{.ID}}')">
+                    <i class="bi bi-trash me-1"></i>删除
+                  </button>
+                </div>
+              </td>
+            </tr>
             {{end}}
-          </td>
-          <td>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</td>
-          <td>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</td>
-          <td>{{.CreatedAt.Format "2006-01-02 15:04:06"}}</td>
-          <td>{{.UpdatedAt.Format "2006-01-02 15:04:06"}}</td>
-          <td class="actions">
-            <a class="linklike" href="/tasks/{{.ID}}">管理</a>
-            <form method="post" action="/tasks/{{.ID}}/run" style="display:inline"><button class="linklike" type="submit" title="立即执行">执行</button></form>
-            <button class="linklike js-delete" data-id="{{.ID}}" data-name="{{.Name}}" title="删除">删除</button>
-          </td>
-        </tr>
-      {{end}}
-      {{end}}
-      </tbody>
-    </table>
+            {{else}}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-5">
+                <i class="bi bi-inbox display-4 d-block mb-3"></i>
+                <h5>暂无任务</h5>
+                <p class="mb-0">点击"新建任务"开始创建您的第一个任务</p>
+              </td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  const taskTable = document.getElementById('taskTable');
+  const filterSelect = document.getElementById('filterSelect');
+  const searchInput = document.getElementById('searchInput');
+  
+  // 设置搜索框占位符
+  searchInput.placeholder = '搜索任务名称';
+  
+  // 设置过滤选项
+  filterSelect.innerHTML = `
+    <option value="">全部任务流</option>
+    <option value="unassigned">未分配</option>
+  `;
+  
   // 动态加载任务流选项
-  loadFlowFilterOptions();
+  function loadFlowOptions() {
+    const rows = taskTable.querySelectorAll('tbody tr[data-flow]');
+    const flows = new Set();
+    
+    rows.forEach(row => {
+      const flowName = row.getAttribute('data-flow');
+      if (flowName && flowName !== '未分配') {
+        flows.add(flowName);
+      }
+    });
+    
+    flows.forEach(flowName => {
+      const option = document.createElement('option');
+      option.value = flowName;
+      option.textContent = flowName;
+      filterSelect.appendChild(option);
+    });
+  }
   
-  createTableFilter('taskTable', 'q', 'flowFilter', {
-    searchFields: ['name', 'id'],
-    filterField: 'flow',
-    emptyText: '暂无任务'
-  });
+  // 加载任务流选项
+  loadFlowOptions();
   
-  // 初始化删除按钮
-  initDeleteButtons('taskTable', '/tasks/{id}', '任务');
-});
-
-function loadFlowFilterOptions() {
-  // 从页面数据中提取任务流信息
-  const rows = document.querySelectorAll('#taskTable tbody tr[data-flow]');
-  const flows = new Set();
-  
-  rows.forEach(row => {
-    const flowName = row.getAttribute('data-flow');
-    if (flowName && flowName !== '未分配') {
-      flows.add(flowName);
+  // 使用通用过滤组件
+  initTableFilter({
+    tableId: 'taskTable',
+    searchColumns: [1], // 只搜索名称
+    filterColumn: null, // 不使用默认列过滤
+    customFilter: function(row, searchTerm, filterValue) {
+      // 自定义过滤逻辑：检查data-flow属性
+      if (filterValue) {
+        const flow = row.getAttribute('data-flow');
+        if (filterValue === 'unassigned') {
+          return !flow || flow === '未分配';
+        }
+        return flow === filterValue;
+      }
+      return true;
     }
   });
   
-  const flowFilter = document.getElementById('flowFilter');
-  flows.forEach(flowName => {
-    const option = document.createElement('option');
-    option.value = flowName;
-    option.textContent = flowName;
-    flowFilter.appendChild(option);
-  });
-}
+});
 </script>
 
 {{template "footer" .}}

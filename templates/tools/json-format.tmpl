@@ -1,13 +1,179 @@
 {{define "tools/json-format.tmpl"}}
 {{template "header" .}}
-<h1>JSON 格式化工具</h1>
-<p>在下方输入或粘贴任意 JSON 内容，点击格式化或压缩按钮即可查看结果。</p>
-<textarea id="jsonInput" style="width:100%;height:200px;font-family:monospace;"></textarea>
-<div style="margin-top:8px;">
-    <button class="btn" type="button" onclick="formatJSON()">格式化</button>
-    <button class="btn" type="button" onclick="minifyJSON()">压缩</button>
+
+<div>
+  <!-- 页面标题 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+      <i class="bi bi-code-square me-2"></i>JSON 格式化工具
+    </h1>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h5 class="card-title mb-0">
+        <i class="bi bi-tools me-2"></i>JSON 处理工具
+      </h5>
+    </div>
+    <div class="card-body">
+      <p class="text-muted mb-4">在下方输入或粘贴任意 JSON 内容，点击格式化或压缩按钮即可查看结果。</p>
+      
+      <div class="mb-3">
+        <label for="jsonInput" class="form-label">输入 JSON 内容</label>
+        <textarea class="form-control font-monospace" 
+                  id="jsonInput" 
+                  rows="8" 
+                  placeholder="请输入 JSON 内容..."></textarea>
+      </div>
+      
+      <div class="d-flex gap-2 mb-3">
+        <button type="button" 
+                class="btn btn-primary" 
+                onclick="formatJSON()">
+          <i class="bi bi-arrow-clockwise me-1"></i>格式化
+        </button>
+        <button type="button" 
+                class="btn btn-outline-secondary" 
+                onclick="minifyJSON()">
+          <i class="bi bi-arrow-down me-1"></i>压缩
+        </button>
+        <button type="button" 
+                class="btn btn-outline-secondary" 
+                onclick="clearJSON()">
+          <i class="bi bi-trash me-1"></i>清空
+        </button>
+        <button type="button" 
+                class="btn btn-outline-secondary" 
+                onclick="copyJSON()">
+          <i class="bi bi-clipboard me-1"></i>复制
+        </button>
+      </div>
+      
+      <div class="mb-3">
+        <label for="jsonOutput" class="form-label">处理结果</label>
+        <pre id="jsonOutput" 
+             class="form-control font-monospace" 
+             style="height: 300px; overflow-y: auto; white-space: pre-wrap;"
+             readonly></pre>
+      </div>
+      
+      <div id="statusAlert" class="alert alert-info" style="display:none;" role="alert">
+        <i class="bi bi-info-circle me-2"></i>
+        <span id="statusMessage"></span>
+      </div>
+    </div>
+  </div>
 </div>
-<pre id="jsonOutput" class="json" style="margin-top:12px;"></pre>
-<script src="/static/js/json_format.js"></script>
+
+<script>
+function formatJSON() {
+  const input = document.getElementById('jsonInput').value.trim();
+  const output = document.getElementById('jsonOutput');
+  const statusAlert = document.getElementById('statusAlert');
+  const statusMessage = document.getElementById('statusMessage');
+  
+  if (!input) {
+    showStatus('请输入 JSON 内容', 'warning');
+    return;
+  }
+  
+  try {
+    const obj = JSON.parse(input);
+    const formatted = JSON.stringify(obj, null, 2);
+    output.textContent = formatted;
+    showStatus('JSON 格式化成功', 'success');
+  } catch (err) {
+    output.textContent = 'JSON 格式错误：' + err.message;
+    showStatus('JSON 格式错误：' + err.message, 'danger');
+  }
+}
+
+function minifyJSON() {
+  const input = document.getElementById('jsonInput').value.trim();
+  const output = document.getElementById('jsonOutput');
+  const statusAlert = document.getElementById('statusAlert');
+  const statusMessage = document.getElementById('statusMessage');
+  
+  if (!input) {
+    showStatus('请输入 JSON 内容', 'warning');
+    return;
+  }
+  
+  try {
+    const obj = JSON.parse(input);
+    const minified = JSON.stringify(obj);
+    output.textContent = minified;
+    showStatus('JSON 压缩成功', 'success');
+  } catch (err) {
+    output.textContent = 'JSON 格式错误：' + err.message;
+    showStatus('JSON 格式错误：' + err.message, 'danger');
+  }
+}
+
+function clearJSON() {
+  document.getElementById('jsonInput').value = '';
+  document.getElementById('jsonOutput').textContent = '';
+  hideStatus();
+}
+
+function copyJSON() {
+  const output = document.getElementById('jsonOutput').textContent;
+  
+  if (!output) {
+    showStatus('没有可复制的内容', 'warning');
+    return;
+  }
+  
+  navigator.clipboard.writeText(output).then(() => {
+    showStatus('已复制到剪贴板', 'success');
+  }).catch(() => {
+    showStatus('复制失败', 'danger');
+  });
+}
+
+function showStatus(message, type) {
+  const statusAlert = document.getElementById('statusAlert');
+  const statusMessage = document.getElementById('statusMessage');
+  
+  statusAlert.className = `alert alert-${type}`;
+  statusMessage.textContent = message;
+  statusAlert.style.display = 'block';
+  
+  // 3秒后自动隐藏
+  setTimeout(() => {
+    hideStatus();
+  }, 3000);
+}
+
+function hideStatus() {
+  document.getElementById('statusAlert').style.display = 'none';
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+  // 可以添加一些示例 JSON
+  const exampleJSON = {
+    "name": "DataX-Web-Go",
+    "version": "1.0.0",
+    "description": "数据同步管理平台",
+    "features": [
+      "任务管理",
+      "任务流调度",
+      "数据源配置",
+      "日志监控"
+    ],
+    "config": {
+      "database": {
+        "host": "localhost",
+        "port": 3306,
+        "name": "datax_web"
+      }
+    }
+  };
+  
+  document.getElementById('jsonInput').value = JSON.stringify(exampleJSON, null, 2);
+});
+</script>
+
 {{template "footer" .}}
 {{end}}

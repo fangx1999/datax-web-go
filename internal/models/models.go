@@ -33,7 +33,7 @@ type Task struct {
 	Name       string `json:"name"`
 	SourceID   int    `json:"source_id"`
 	TargetID   int    `json:"target_id"`
-	JsonConfig string `json:"json_config"`
+	JsonConfig string `json:"datax_json"`
 	// Additional fields for display
 	Source        string    `json:"source,omitempty"`
 	Target        string    `json:"target,omitempty"`

@@ -5,30 +5,71 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{block "title" .}}DataX-Web-Go{{end}}</title>
-  <link rel="stylesheet" href="/static/css/style.css">
-  <script src="/static/js/common.js"></script>
+  
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 </head>
 <body>
-  <header class="topnav">
-    <div class="container nav-inner">
-      <div class="brand">
-        <span class="logo" aria-hidden="true"></span>
-        <a href="/">DataX-Web-UI</a>
-      </div>
-      <nav class="nav-links" role="navigation">
-        <a href="/tasks" id="tasks">任务</a>
-        <a href="/task-flows" id="taskflows">任务流</a>
-        <a href="/flow-logs" id="flow-logs">任务流日志</a>
-        <a href="/task-logs" id="task-logs">任务日志</a>
-        <a href="/data-sources" id="data_sources">数据源</a>
-
-        <a href="/tools/json-format" id="json-tools">JSON工具</a>
-        <a href="/admin/users" id="users">用户</a>
-      </nav>
-      <div class="nav-actions">
-        <a class="btn" href="/logout">退出</a>
+  <!-- Bootstrap 导航栏 -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+    <div class="container-fluid" style="max-width: 1700px; margin: 0 auto;">
+      <a class="navbar-brand fw-bold" href="/">
+        <i class="bi bi-database-gear me-2"></i>DataX-Web-UI
+      </a>
+      
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/tasks" id="tasks">
+              <i class="bi bi-list-task me-1"></i>任务
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/task-flows" id="taskflows">
+              <i class="bi bi-diagram-3 me-1"></i>任务流
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/flow-logs" id="flow-logs">
+              <i class="bi bi-journal-text me-1"></i>任务流实例
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/task-logs" id="task-logs">
+              <i class="bi bi-file-text me-1"></i>任务实例
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/data-sources" id="data_sources">
+              <i class="bi bi-hdd-stack me-1"></i>数据源
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/tools/json-format" id="json-tools">
+              <i class="bi bi-code-square me-1"></i>JSON工具
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/users" id="users">
+              <i class="bi bi-people me-1"></i>用户
+            </a>
+          </li>
+        </ul>
+        
+        <div class="navbar-nav">
+          <a class="btn btn-outline-danger btn-sm" href="/logout">
+            <i class="bi bi-box-arrow-right me-1"></i>退出
+          </a>
+        </div>
       </div>
     </div>
-  </header>
-  <main class="container page">
+  </nav>
+  
+  <main class="container-fluid my-4" style="max-width: 1700px; margin: 0 auto;">
 {{end}}

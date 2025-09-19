@@ -1,198 +1,474 @@
 {{define "data_source/list.tmpl"}}
 {{template "header" .}}
+{{template "common/confirm_modal.tmpl" .}}
+{{template "common/alert.tmpl" .}}
 
-<div class="page">
-    <div class="toolbar">
-        <h1 class="h1">数据源管理</h1>
-        <div class="controls">
-            <input id="q" type="search" placeholder="搜索名称或ID" aria-label="搜索名称或ID">
-            <select id="typeFilter" aria-label="按类型筛选">
-                <option value="">全部类型</option>
-                <option value="mysql">MySQL</option>
-                <option value="ofs">OFS</option>
-                <option value="hdfs">HDFS</option>
-                <option value="cosn">COSN</option>
-            </select>
-            <button class="btn primary" type="button" id="btnNewDs">➕ 添加数据源</button>
-        </div>
-    </div>
+<div>
+  <!-- 页面标题和工具栏 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+      <i class="bi bi-hdd-stack me-2"></i>数据源管理
+    </h1>
+    <button type="button" 
+            class="btn btn-primary" 
+            data-bs-toggle="modal" 
+            data-bs-target="#dataSourceModal">
+      <i class="bi bi-plus-circle me-1"></i>添加数据源
+    </button>
+  </div>
 
-    <div class="table-wrap">
-        <table class="table" id="dsTable">
-            <thead>
+  <!-- 搜索和过滤 -->
+  {{template "table_filter" .}}
+
+  <!-- 数据源列表 -->
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0" id="dsTable">
+          <thead class="table-light">
             <tr>
-                <th>ID</th>
-                <th>名称</th>
-                <th>类型</th>
-                <th>创建人</th>
-                <th>最后操作人</th>
-                <th>创建时间</th>
-                <th>操作</th>
+              <th width="5%">ID</th>
+              <th width="18%">名称</th>
+              <th width="13%">类型</th>
+              <th width="13%">创建人</th>
+              <th width="13%">最后操作人</th>
+              <th width="18%">创建时间</th>
+              <th width="15%">操作</th>
             </tr>
-            </thead>
-            <tbody>
+          </thead>
+          <tbody>
             {{if .DataSources}}
             {{range .DataSources}}
-            <tr data-id="{{.ID}}" data-name="{{.Name}}" data-type="{{.Type}}">
-                <td>{{.ID}}</td>
-                <td>{{.Name}}</td>
-                <td><span class="type-badge">{{.Type}}</span></td>
-                <td>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</td>
-                <td>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</td>
-                <td>{{.CreatedAt.Format "2006-01-02 15:04:06"}}</td>
-                <td class="actions">
-                    <a class="linklike js-edit" href="#" data-id="{{.ID}}">编辑</a>
-                    <button class="linklike js-delete" data-id="{{.ID}}" data-name="{{.Name}}">删除</button>
-                </td>
+            <tr data-id="{{.ID}}" 
+                data-name="{{.Name}}" 
+                data-type="{{.Type}}">
+              <td class="fw-semibold">{{.ID}}</td>
+              <td>
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-hdd me-2 text-muted"></i>
+                  <span class="fw-medium">{{.Name}}</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge bg-{{if eq .Type "mysql"}}primary{{else if eq .Type "ofs"}}success{{else if eq .Type "hdfs"}}info{{else}}warning{{end}}">
+                  {{.Type}}
+                </span>
+              </td>
+              <td>
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-person me-1 text-muted"></i>
+                  <span>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</span>
+                </div>
+              </td>
+              <td>
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-person me-1 text-muted"></i>
+                  <span>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</span>
+                </div>
+              </td>
+              <td>
+                <small class="text-muted">{{.CreatedAt.Format "2006-01-02 15:04:06"}}</small>
+              </td>
+              <td>
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" 
+                          class="btn btn-outline-primary btn-sm js-edit" 
+                          data-ds-id="{{.ID}}"
+                          title="编辑数据源">
+                    <i class="bi bi-pencil me-1"></i>编辑
+                  </button>
+                  <button type="button" 
+                          class="btn btn-outline-danger btn-sm" 
+                          onclick="showDeleteConfirm('数据源 \'{{.Name}}\'', '/data-sources/{{.ID}}')"
+                          title="删除数据源">
+                    <i class="bi bi-trash me-1"></i>删除
+                  </button>
+                </div>
+              </td>
             </tr>
             {{end}}
+            {{else}}
+            <tr>
+              <td colspan="7" class="text-center text-muted py-5">
+                <i class="bi bi-inbox display-4 d-block mb-3"></i>
+                <h5>暂无数据源</h5>
+                <p class="mb-0">点击"添加数据源"开始配置您的第一个数据源</p>
+              </td>
+            </tr>
             {{end}}
-            </tbody>
+          </tbody>
         </table>
+      </div>
     </div>
+  </div>
 </div>
 
-{{template "data_source/modal.tmpl" .}}
+<!-- 数据源编辑模态框 -->
+<div class="modal fade" id="dataSourceModal" tabindex="-1" aria-labelledby="dataSourceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="dataSourceModalLabel">
+          <i class="bi bi-hdd-stack me-2"></i>数据源配置
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="dataSourceForm" method="post" action="/data-sources">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="dsName" class="form-label">数据源名称 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="dsName" name="name" required>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="dsType" class="form-label">数据源类型 <span class="text-danger">*</span></label>
+                <select class="form-select" id="dsType" name="type" required onchange="toggleDataSourceFields()">
+                  <option value="">请选择类型...</option>
+                  <option value="mysql">MySQL</option>
+                  <option value="ofs">OFS</option>
+                  <option value="hdfs">HDFS</option>
+                  <option value="cosn">COSN</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- MySQL 配置 -->
+          <div id="mysqlFields" class="ds-fields" style="display:none;">
+            <h6 class="text-muted mb-3">MySQL 配置</h6>
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="dbUrl" class="form-label">数据库地址 <span class="text-danger">*</span></label>
+                  <input type="text" 
+                         class="form-control" 
+                         id="dbUrl" 
+                         name="db_url" 
+                         placeholder="localhost:3306">
+                  <div class="form-text">格式：主机地址:端口</div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="dbDatabase" class="form-label">数据库名 <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" id="dbDatabase" name="db_database">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="dbUser" class="form-label">用户名 <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" id="dbUser" name="db_user">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="dbPassword" class="form-label">密码 <span class="text-danger">*</span></label>
+                  <input type="password" class="form-control" id="dbPassword" name="db_password">
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="mb-3">
+                  <label class="form-label">连接预览</label>
+                  <div class="input-group">
+                    <input type="text" class="form-control" id="dsnPreview" readonly>
+                    <button type="button" class="btn btn-outline-secondary" onclick="testConnection()">
+                      <i class="bi bi-wifi me-1"></i>测试连接
+                    </button>
+                  </div>
+                  <div id="connectionTestResult" class="mt-2" style="display: none;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 文件系统配置 -->
+          <div id="fsFields" class="ds-fields" style="display:none;">
+            <h6 class="text-muted mb-3">文件系统配置</h6>
+            <div class="row">
+              <div class="col-12">
+                <div class="mb-3">
+                  <label for="defaultFS" class="form-label">文件系统地址 <span class="text-danger">*</span></label>
+                  <input type="text" 
+                         class="form-control" 
+                         id="defaultFS" 
+                         name="defaultfs" 
+                         placeholder="hdfs://namenode:9000">
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="mb-3">
+                  <label for="hadoopConfig" class="form-label">Hadoop配置</label>
+                  <textarea class="form-control" 
+                            id="hadoopConfig" 
+                            name="hadoopconfig" 
+                            rows="4"
+                            placeholder='JSON格式配置'></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 
 <script>
+// ==================== 页面初始化 ====================
 document.addEventListener('DOMContentLoaded', function() {
-  // 使用通用搜索筛选功能
-  createTableFilter('dsTable', 'q', 'typeFilter', {
-    searchFields: ['name', 'id'],
-    filterField: 'type',
-    emptyText: '无匹配结果'
-  });
+  initializeTableFilters();
+  initializeEditHandlers();
+});
 
-  // 新建数据源按钮
-  document.getElementById('btnNewDs').addEventListener('click', function () {
-    prepareCreateForm();
-    if (typeof openDsModal === 'function') {
-      openDsModal();
-    } else {
-      console.error('openDsModal function not found');
-    }
-  });
-
-  // 初始化删除按钮
-  initDeleteButtons('dsTable', '/data-sources/{id}', '数据源');
-
-  // 编辑数据源按钮
-  document.getElementById('dsTable').addEventListener('click', function (e) {
-    var editBtn = e.target.closest('.js-edit');
-    
-    if (editBtn) {
-      e.preventDefault();
-      var id = editBtn.dataset.id;
-      if (!id) {
-        location.href = editBtn.href;
-        return;
-      }
-      
-      // 使用通用API请求函数
-      apiRequest('/data-sources/' + id + '?format=json')
-        .then(function (result) {
-          if (result.success && result.data) {
-            prepareEditForm(result.data);
-            if (typeof openDsModal === 'function') {
-              openDsModal();
-            } else {
-              console.error('openDsModal function not found');
-            }
-          } else {
-            console.error('加载数据失败:', result.error);
-            alert('加载数据失败：' + result.error);
-          }
-        })
-        .catch(function(error) {
-          console.error('请求异常:', error);
-          alert('请求异常：' + error.message);
-        });
-    }
-  });
-
-  // —— 跟弹窗交互：这些函数在 modal 里会读取
-  window.prepareCreateForm = function () {
-    var form = document.getElementById('dsForm'), typeEl = document.getElementById('dstype');
-    if (!form) return;
-    form.reset();
-    form.action = '/data-sources';
-    typeEl.value = 'mysql';
-    typeEl.dispatchEvent(new Event('change'));
-    var title = document.getElementById('dsTitle');
-    if (title) title.textContent = '新建数据源';
-    var badge = document.getElementById('dsBadge');
-    if (badge) badge.textContent = '创建中';
-  };
+// ==================== 表格过滤功能 ====================
+// 初始化表格过滤
+function initializeTableFilters() {
+  // 配置过滤选项
+  const filterSelect = document.getElementById('filterSelect');
+  const searchInput = document.getElementById('searchInput');
   
-  window.prepareEditForm = function (ds) {
-    var form = document.getElementById('dsForm');
-    if (!form) {
-      console.error('找不到表单元素 dsForm');
+  // 设置搜索框占位符
+  searchInput.placeholder = '搜索名称';
+  
+  // 设置过滤选项
+  filterSelect.innerHTML = `
+    <option value="">全部类型</option>
+    <option value="mysql">MySQL</option>
+    <option value="ofs">OFS</option>
+    <option value="hdfs">HDFS</option>
+    <option value="cosn">COSN</option>
+  `;
+  
+  initTableFilter({
+    tableId: 'dsTable',
+    searchColumns: [1], // 只搜索名称
+    filterColumn: 2 // 类型列
+  });
+}
+
+// ==================== 编辑功能 ====================
+function initializeEditHandlers() {
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.js-edit')) {
+      const button = e.target.closest('.js-edit');
+      const dsId = button.getAttribute('data-ds-id');
+      loadDataSourceForEdit(dsId);
+    }
+  });
+}
+
+// ==================== 数据源字段管理 ====================
+function toggleDataSourceFields() {
+  const dsType = document.getElementById('dsType').value;
+  const mysqlFields = document.getElementById('mysqlFields');
+  const fsFields = document.getElementById('fsFields');
+  
+  // 隐藏所有字段
+  mysqlFields.style.display = 'none';
+  fsFields.style.display = 'none';
+  
+  // 显示对应字段
+  if (dsType === 'mysql') {
+    mysqlFields.style.display = 'block';
+    addMySQLFieldListeners();
+  } else if (['ofs', 'hdfs', 'cosn'].includes(dsType)) {
+    fsFields.style.display = 'block';
+  }
+}
+
+function addMySQLFieldListeners() {
+  const fields = ['dbUrl', 'dbUser', 'dbPassword', 'dbDatabase'];
+  fields.forEach(fieldId => {
+    const field = document.getElementById(fieldId);
+    if (field) {
+      field.addEventListener('input', updateDSNPreview);
+    }
+  });
+}
+
+function updateDSNPreview() {
+  const dbUrl = document.getElementById('dbUrl').value || 'localhost:3306';
+  const user = document.getElementById('dbUser').value || '';
+  const password = document.getElementById('dbPassword').value || '';
+  const database = document.getElementById('dbDatabase').value || '';
+  
+  let dsn = `${user}:${password}@tcp(${dbUrl})/${database}`;
+  if (!user && !password) {
+    dsn = `tcp(${dbUrl})/${database}`;
+  }
+  
+  document.getElementById('dsnPreview').value = dsn;
+}
+
+// ==================== 连接测试功能 ====================
+function testConnection() {
+  const form = document.getElementById('dataSourceForm');
+  const isEditMode = form.action.includes('/data-sources/') && !form.action.endsWith('/data-sources');
+  
+  let requestBody;
+  
+  if (isEditMode) {
+    // 编辑模式：只发送ID，后端会从数据库获取所有连接信息
+    const dsId = form.action.split('/').pop();
+    requestBody = { id: dsId };
+  } else {
+    // 新建模式：需要校验所有参数
+    const dbUrl = document.getElementById('dbUrl').value;
+    const user = document.getElementById('dbUser').value;
+    const password = document.getElementById('dbPassword').value;
+    const database = document.getElementById('dbDatabase').value;
+    
+    if (!dbUrl || !user || !database) {
+      showConnectionTestAlert('alert-warning', 'exclamation-triangle', '请填写完整的数据库连接信息');
       return;
     }
     
-    var typeEl = document.getElementById('dstype');
-    if (!typeEl) {
-      console.error('找不到类型选择元素 dstype');
-    }
+    requestBody = {
+      db_url: dbUrl,
+      db_user: user,
+      db_password: password,
+      db_database: database
+    };
+  }
+  
+  const testBtn = document.querySelector('button[onclick="testConnection()"]');
+  const originalText = testBtn.innerHTML;
+  testBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>测试中...';
+  testBtn.disabled = true;
+  
+  fetch('/data-sources/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody)
+  })
+  .then(response => response.json())
+  .then(data => {
+    const resultDiv = document.getElementById('connectionTestResult');
+    const alertClass = data.success ? 'alert-success' : 'alert-danger';
+    const icon = data.success ? 'check-circle' : 'exclamation-triangle';
+    const message = data.success ? '数据库连接测试成功' : (data.error || '数据库连接测试失败');
     
-    // 使用统一的字段标准化函数
-    var normalizedDs = normalizeDataSourceFields(ds);
-    
-    form.reset();
-    form.action = '/data-sources/' + normalizedDs.id;
-    
-    var hid = form.querySelector('input[name="id"]');
-    if (!hid) {
-      hid = document.createElement('input');
-      hid.type = 'hidden';
-      hid.name = 'id';
-      form.prepend(hid);
-    }
-    hid.value = normalizedDs.id;
-    
-    var nameEl = document.getElementById('name');
-    if (nameEl) {
-      nameEl.value = normalizedDs.name || '';
-    } else {
-      console.error('找不到名称字段');
-    }
-    
-    var t = (normalizedDs.type || 'mysql').toLowerCase();
-    if (typeEl) {
-      typeEl.value = t;
-      typeEl.dispatchEvent(new Event('change'));
-    }
+    resultDiv.innerHTML = createAlertHTML(alertClass, icon, message);
+    resultDiv.style.display = 'block';
+  })
+  .catch(error => {
+    console.error('测试连接失败:', error);
+    showConnectionTestAlert('alert-danger', 'exclamation-triangle', '数据库连接测试失败');
+  })
+  .finally(() => {
+    testBtn.innerHTML = originalText;
+    testBtn.disabled = false;
+  });
+}
 
-    // 回填字段（存在才填）
-    function setVal(id, v) {
-      var el = document.getElementById(id);
-      if (el && v != null) {
-        el.value = v;
+function showConnectionTestAlert(alertClass, icon, message) {
+  const resultDiv = document.getElementById('connectionTestResult');
+  resultDiv.innerHTML = createAlertHTML(alertClass, icon, message);
+  resultDiv.style.display = 'block';
+}
+
+function createAlertHTML(alertClass, icon, message) {
+  return `
+    <div class="alert ${alertClass} alert-sm mb-0" role="alert">
+      <i class="bi bi-${icon} me-1"></i>${message}
+    </div>
+  `;
+}
+
+// ==================== 编辑数据源功能 ====================
+function loadDataSourceForEdit(dsId) {
+  fetch(`/data-sources/${dsId}`)
+    .then(response => response.json())
+    .then(data => {
+      // 设置基本信息
+      document.getElementById('dsName').value = data.name || '';
+      document.getElementById('dsType').value = data.type || '';
+      
+      // 设置表单为编辑模式
+      const form = document.getElementById('dataSourceForm');
+      form.action = `/data-sources/${dsId}`;
+      
+      // 添加PUT方法字段
+      let methodInput = form.querySelector('input[name="_method"]');
+      if (!methodInput) {
+        methodInput = document.createElement('input');
+        methodInput.type = 'hidden';
+        methodInput.name = '_method';
+        methodInput.value = 'PUT';
+        form.appendChild(methodInput);
       }
-    }
-
-    setVal('db_url', normalizedDs.db_url);
-    setVal('db_database', normalizedDs.db_database);
-    setVal('db_user', normalizedDs.db_user);
-    // 密码字段不设置值，避免密码泄漏警告
-    // setVal('db_password', normalizedDs.db_password);
-    setVal('ofs_defaultfs', normalizedDs.defaultfs);
-    setVal('ofs_hadoopconfig', normalizedDs.hadoopconfig);
-    setVal('hdfs_defaultfs', normalizedDs.defaultfs);
-    setVal('hdfs_hadoopconfig', normalizedDs.hadoopconfig);
-    setVal('cosn_defaultfs', normalizedDs.defaultfs);
-    setVal('cosn_hadoopconfig', normalizedDs.hadoopconfig);
-    ['db_url', 'db_database', 'db_user', 'db_password'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.dispatchEvent(new Event('input'));
+      
+      // 显示对应的字段
+      toggleDataSourceFields();
+      
+      // 填充具体字段
+      if (data.type === 'mysql') {
+        document.getElementById('dbUrl').value = data.db_url || '';
+        document.getElementById('dbUser').value = data.db_user || '';
+        document.getElementById('dbPassword').value = ''; // 密码不显示
+        document.getElementById('dbDatabase').value = data.db_database || '';
+        updateDSNPreview();
+      } else {
+        document.getElementById('defaultFS').value = data.defaultfs || '';
+        document.getElementById('hadoopConfig').value = data.hadoopconfig || '';
+      }
+      
+      // 更新模态框标题
+      document.getElementById('dataSourceModalLabel').innerHTML = 
+        '<i class="bi bi-pencil me-2"></i>编辑数据源';
+      
+      // 显示模态框
+      const modal = new bootstrap.Modal(document.getElementById('dataSourceModal'));
+      modal.show();
+    })
+    .catch(error => {
+      console.error('加载数据源信息失败:', error);
+      // 尝试在模态框内显示错误
+      const resultDiv = document.getElementById('connectionTestResult');
+      if (resultDiv) {
+        showConnectionTestAlert('alert-danger', 'exclamation-triangle', '加载数据源信息失败');
+      } else {
+        // 如果模态框还没打开，使用页面通知
+        showAlert('加载数据源信息失败', 'danger');
+      }
     });
-    var title = document.getElementById('dsTitle');
-    if (title) title.textContent = '编辑数据源';
-    var badge = document.getElementById('dsBadge');
-    if (badge) badge.textContent = 'ID: ' + normalizedDs.id;
-  };
+}
+
+// ==================== 模态框管理 ====================
+document.getElementById('dataSourceModal').addEventListener('hidden.bs.modal', function () {
+  const form = document.getElementById('dataSourceForm');
+  form.reset();
+  form.action = '/data-sources';
+  
+  // 移除编辑相关的隐藏字段
+  const methodInput = form.querySelector('input[name="_method"]');
+  if (methodInput) {
+    methodInput.remove();
+  }
+  
+  // 重置标题
+  document.getElementById('dataSourceModalLabel').innerHTML = 
+    '<i class="bi bi-plus-circle me-2"></i>添加数据源';
+  
+  // 隐藏所有字段
+  toggleDataSourceFields();
+  
+  // 清除测试结果
+  const resultDiv = document.getElementById('connectionTestResult');
+  if (resultDiv) {
+    resultDiv.style.display = 'none';
+    resultDiv.innerHTML = '';
+  }
 });
+
 </script>
 
 {{template "footer" .}}

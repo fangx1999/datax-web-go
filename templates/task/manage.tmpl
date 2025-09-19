@@ -1,183 +1,259 @@
 {{define "task/manage.tmpl"}}
 {{template "header" .}}
+{{template "common/confirm_modal.tmpl" .}}
+{{template "common/alert.tmpl" .}}
 
-<div class="page">
-  <div class="toolbar">
-    <h1 class="h1">任务管理</h1>
-    <div class="controls">
-      <a class="btn" href="/tasks">← 返回列表</a>
+<div class="container-fluid">
+  <!-- 页面标题 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-1">
+        <i class="bi bi-gear-fill me-2 text-primary"></i>任务管理
+      </h1>
+      <p class="text-muted mb-0">管理任务配置和执行</p>
     </div>
+    <a href="/tasks" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>返回列表
+    </a>
   </div>
 
-  <!-- 任务信息卡片 -->
-  <div class="card">
-    <div class="card-header">
-      <h3>任务信息</h3>
-    </div>
-    <div class="task-info">
-      <div class="info-row">
-        <div class="info-label">任务ID</div>
-        <div class="info-value">{{.Task.ID}}</div>
-      </div>
-      <div class="info-row">
-        <div class="info-label">任务名称</div>
-        <div class="info-value">{{.Task.Name}}</div>
-      </div>
-      <div class="info-row">
-        <div class="info-label">数据源</div>
-        <div class="info-value">
-          <span class="data-source-flow-inline">
-            <span class="source-inline">{{.Task.Source}}</span>
-            <span class="arrow-inline">→</span>
-            <span class="target-inline">{{.Task.Target}}</span>
-          </span>
+  <!-- 任务概览卡片 -->
+  <div class="row mb-4">
+    <div class="col-md-8">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-info-circle-fill me-2"></i>任务信息
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-4">
+            <div class="col-md-6">
+              <div class="d-flex align-items-center">
+                <div class="bg-light rounded-circle p-2 me-3">
+                  <i class="bi bi-file-earmark-text text-primary"></i>
+                </div>
+                <div>
+                  <small class="text-muted d-block">任务名称</small>
+                  <span class="fw-bold fs-4">{{.Task.Name}}</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="d-flex align-items-center">
+                <div class="bg-light rounded-circle p-2 me-3">
+                  <i class="bi bi-arrow-left-right text-primary"></i>
+                </div>
+                <div class="flex-grow-1">
+                  <small class="text-muted d-block">数据流向</small>
+                  <div class="d-flex align-items-center">
+                    <span class="badge bg-primary fs-6 px-3 py-2">{{.Task.Source}}</span>
+                    <i class="bi bi-arrow-right mx-3 text-muted"></i>
+                    <span class="badge bg-success fs-6 px-3 py-2">{{.Task.Target}}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="info-row">
-        <div class="info-label">创建时间</div>
-        <div class="info-value">{{.Task.CreatedAt.Format "2006-01-02 15:04:05"}}</div>
-      </div>
-      <div class="info-row">
-        <div class="info-label">更新时间</div>
-        <div class="info-value">{{.Task.UpdatedAt.Format "2006-01-02 15:04:05"}}</div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-info text-white">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-clock-fill me-2"></i>时间信息
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <small class="text-muted d-block">创建时间</small>
+            <span class="fw-semibold">{{.Task.CreatedAt.Format "2006-01-02 15:04:05"}}</span>
+          </div>
+          <div>
+            <small class="text-muted d-block">更新时间</small>
+            <span class="fw-semibold">{{.Task.UpdatedAt.Format "2006-01-02 15:04:05"}}</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-
 
   <!-- JSON配置卡片 -->
-  <div class="card">
-    <div class="card-header">
-      <h3>DataX JSON 配置</h3>
-      <div class="card-actions">
-        <button id="editJsonBtn" class="btn" onclick="toggleJsonEdit()">
-          <span class="btn-icon">✏</span>
-          编辑
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-dark text-white">
+      <h5 class="card-title mb-0">
+        <i class="bi bi-code-square-fill me-2"></i>DataX 配置
+      </h5>
+    </div>
+    <div class="card-body">
+      <div class="d-flex gap-2 mb-3 flex-wrap">
+        <button type="button" 
+                class="btn btn-outline-primary" 
+                onclick="toggleEditMode()"
+                id="editBtn">
+          <i class="bi bi-pencil me-1"></i>编辑配置
+        </button>
+        <button type="button" 
+                class="btn btn-outline-info" 
+                onclick="formatJSON()"
+                id="formatBtn">
+          <i class="bi bi-arrow-clockwise me-1"></i>格式化
+        </button>
+        <button type="button" 
+                class="btn btn-outline-success" 
+                onclick="copyJSON()"
+                id="copyBtn">
+          <i class="bi bi-clipboard me-1"></i>复制
         </button>
       </div>
-    </div>
-    <div class="json-container">
-      <pre class="json" id="jsonDisplay">{{.Task.JsonConfig}}</pre>
-      <div class="json-edit hidden" id="jsonEdit">
-        <div class="json-edit-header">
-          <span class="json-edit-tip">💡 提示：使用 Ctrl+S 保存，Esc 取消编辑</span>
+      
+      <div id="jsonDisplay" class="border rounded-3 p-3 bg-dark text-light" style="background: #1e1e1e !important;">
+        <pre id="jsonContent" class="mb-0 font-monospace small" style="color: #d4d4d4; line-height: 1.5;">{{.Task.JsonConfig}}</pre>
+      </div>
+      
+      <div id="jsonEdit" style="display:none;">
+        <div class="position-relative">
+          <textarea class="form-control font-monospace border-0 rounded-3" 
+                    rows="15" 
+                    id="jsonTextarea"
+                    style="background: #1e1e1e; color: #d4d4d4; resize: vertical; font-size: 14px; line-height: 1.5;">{{.Task.JsonConfig}}</textarea>
+          <div class="position-absolute top-0 end-0 p-2">
+            <small class="text-muted">JSON 编辑器</small>
+          </div>
         </div>
-        <textarea id="jsonTextarea" class="json-textarea" rows="20" placeholder="请输入有效的JSON配置...">{{.Task.JsonConfig}}</textarea>
-        <div class="json-edit-actions">
-          <button class="btn primary" onclick="saveJson()">
-            <span class="btn-icon">💾</span>
-            保存
+        <div class="d-flex gap-2 mt-3">
+          <button type="button" 
+                  class="btn btn-success" 
+                  onclick="saveJSON()"
+                  id="saveBtn">
+            <i class="bi bi-check-circle me-1"></i>保存配置
           </button>
-          <button class="btn" onclick="cancelJsonEdit()">
-            <span class="btn-icon">❌</span>
-            取消
+          <button type="button" 
+                  class="btn btn-outline-secondary" 
+                  onclick="cancelEdit()"
+                  id="cancelBtn">
+            <i class="bi bi-x-circle me-1"></i>取消编辑
           </button>
         </div>
       </div>
     </div>
   </div>
-
-  <!-- JSON编辑表单（隐藏） -->
-  <form id="jsonEditForm" method="post" action="/tasks/{{.Task.ID}}" style="display:none">
-    <input type="hidden" name="datax_json" id="hiddenJsonConfig">
-  </form>
 
 </div>
 
+
 <script>
-let isJsonEditing = false;
+let isEditMode = false;
+let originalJSON = '';
 
-function toggleJsonEdit() {
-  const editBtn = document.getElementById('editJsonBtn');
+function toggleEditMode() {
   const jsonDisplay = document.getElementById('jsonDisplay');
   const jsonEdit = document.getElementById('jsonEdit');
-  const jsonTextarea = document.getElementById('jsonTextarea');
+  const editBtn = document.getElementById('editBtn');
   
-  if (!isJsonEditing) {
+  if (!isEditMode) {
     // 进入编辑模式
-    editBtn.classList.add('hidden'); // 隐藏右上角按钮
-    jsonDisplay.classList.add('hidden');
-    jsonEdit.classList.remove('hidden');
+    originalJSON = document.getElementById('jsonContent').textContent;
+    document.getElementById('jsonTextarea').value = originalJSON;
     
-    // 设置textarea的值
-    jsonTextarea.value = jsonDisplay.textContent;
-    
-    // 自动聚焦并选中所有文本
-    jsonTextarea.focus();
-    jsonTextarea.select();
-    
-    isJsonEditing = true;
+    jsonDisplay.style.display = 'none';
+    jsonEdit.style.display = 'block';
+    editBtn.innerHTML = '<i class="bi bi-eye me-1"></i>预览模式';
+    editBtn.classList.remove('btn-outline-primary');
+    editBtn.classList.add('btn-outline-secondary');
+    isEditMode = true;
   } else {
-    // 取消编辑
-    cancelJsonEdit();
+    // 退出编辑模式
+    jsonDisplay.style.display = 'block';
+    jsonEdit.style.display = 'none';
+    editBtn.innerHTML = '<i class="bi bi-pencil me-1"></i>编辑配置';
+    editBtn.classList.remove('btn-outline-secondary');
+    editBtn.classList.add('btn-outline-primary');
+    isEditMode = false;
   }
 }
 
-function saveJson() {
+function formatJSON() {
+  const jsonContent = document.getElementById('jsonContent');
   const jsonTextarea = document.getElementById('jsonTextarea');
-  const jsonValue = jsonTextarea.value.trim();
   
-  // 设置隐藏表单的值
-  document.getElementById('hiddenJsonConfig').value = jsonValue;
-  
-  // 使用统一的校验函数
-  const errors = validateForm(document.getElementById('jsonEditForm'), {
-    datax_json: {
-      required: true,
-      minLength: 1,
-      label: 'DataX配置'
-    }
-  });
-  
-  if (errors.length > 0) {
-    showFormErrors(errors, document.getElementById('jsonEditForm'));
-    return;
-  }
-  
-  // JSON格式验证
   try {
-    JSON.parse(jsonValue);
-  } catch (e) {
-    alert('JSON格式不正确，请检查后重试：\n' + e.message);
-    return;
+    const obj = JSON.parse(jsonContent.textContent);
+    const formatted = JSON.stringify(obj, null, 2);
+    
+    if (isEditMode) {
+      jsonTextarea.value = formatted;
+    } else {
+      jsonContent.textContent = formatted;
+    }
+    
+    showAlert('JSON 格式化完成', 'success');
+  } catch (err) {
+    showAlert('JSON 格式错误：' + err.message, 'danger');
   }
-  
-  // 提交表单
-  document.getElementById('jsonEditForm').submit();
 }
 
-function cancelJsonEdit() {
-  const editBtn = document.getElementById('editJsonBtn');
+function copyJSON() {
+  const jsonContent = document.getElementById('jsonContent').textContent;
+  
+  navigator.clipboard.writeText(jsonContent).then(() => {
+    showAlert('已复制到剪贴板', 'success');
+  }).catch(() => {
+    showAlert('复制失败', 'danger');
+  });
+}
+
+function saveJSON() {
+  const jsonTextarea = document.getElementById('jsonTextarea');
+  const jsonContent = document.getElementById('jsonContent');
+  
+  try {
+    // 验证 JSON 格式
+    const obj = JSON.parse(jsonTextarea.value);
+    
+    // 提交表单
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/tasks/{{.Task.ID}}';
+    
+    const methodInput = document.createElement('input');
+    methodInput.type = 'hidden';
+    methodInput.name = '_method';
+    methodInput.value = 'PUT';
+    form.appendChild(methodInput);
+    
+    const jsonInput = document.createElement('input');
+    jsonInput.type = 'hidden';
+    jsonInput.name = 'datax_json';
+    jsonInput.value = jsonTextarea.value;
+    form.appendChild(jsonInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+  } catch (err) {
+    showAlert('JSON 格式错误：' + err.message, 'danger');
+  }
+}
+
+function cancelEdit() {
   const jsonDisplay = document.getElementById('jsonDisplay');
   const jsonEdit = document.getElementById('jsonEdit');
-  const jsonTextarea = document.getElementById('jsonTextarea');
+  const editBtn = document.getElementById('editBtn');
   
-  // 恢复原始值
-  jsonTextarea.value = jsonDisplay.textContent;
-  
-  // 退出编辑模式
-  editBtn.classList.remove('hidden'); // 重新显示右上角按钮
-  editBtn.innerHTML = '<span class="btn-icon">✏</span>编辑';
-  editBtn.className = 'btn';
-  jsonDisplay.classList.remove('hidden');
-  jsonEdit.classList.add('hidden');
-  isJsonEditing = false;
+  jsonDisplay.style.display = 'block';
+  jsonEdit.style.display = 'none';
+  editBtn.innerHTML = '<i class="bi bi-pencil me-1"></i>编辑配置';
+  editBtn.classList.remove('btn-outline-secondary');
+  editBtn.classList.add('btn-outline-primary');
+  isEditMode = false;
 }
 
-// 添加键盘快捷键支持
-document.addEventListener('keydown', function(e) {
-  if (isJsonEditing) {
-    // Ctrl+S 保存
-    if (e.ctrlKey && e.key === 's') {
-      e.preventDefault();
-      saveJson();
-    }
-    // Esc 取消
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      cancelJsonEdit();
-    }
-  }
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+  // 格式化初始 JSON
+  formatJSON();
 });
 </script>
 

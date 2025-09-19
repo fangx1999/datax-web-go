@@ -1,108 +1,177 @@
 {{define "taskflow/list.tmpl"}}
 {{template "header" .}}
+{{template "common/confirm_modal.tmpl" .}}
+{{template "common/alert.tmpl" .}}
 
-<div class="page">
-  <div class="toolbar">
-    <h1 class="h1">任务流管理</h1>
-    <div class="controls">
-      <input id="q" type="search" placeholder="搜索任务流名称或ID…">
-      <select id="enableFilter" aria-label="按启用筛选">
-        <option value="">全部</option>
-        <option value="1">已启用</option>
-        <option value="0">未启用</option>
-      </select>
-      <a class="btn primary" href="/task-flows/new">➕ 新建任务流</a>
-    </div>
-  </div>
+<div>
+      <!-- 页面标题和工具栏 -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+          <i class="bi bi-diagram-3 me-2"></i>任务流管理
+        </h1>
+        <a href="/task-flows/new" class="btn btn-primary">
+          <i class="bi bi-plus-circle me-1"></i>新建任务流
+        </a>
+      </div>
 
-  <div class="table-wrap">
-    <table class="table" id="flowTable">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>名称</th>
-          <th>描述</th>
-          <th>调度(CRON)</th>
-          <th>启用</th>
-          <th>创建人</th>
-          <th>最后操作人</th>
-          <th>创建时间</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-      {{if .Flows}}
-      {{range .Flows}}
-        <tr data-id="{{.ID}}" data-name="{{.Name}}" data-enabled="{{if .Enabled}}1{{else}}0{{end}}">
-          <td>{{.ID}}</td>
-          <td>{{.Name}}</td>
-          <td>{{.Description}}</td>
-          <td><code>{{.CronExpr}}</code></td>
-          <td>{{if .Enabled}}✅{{else}}❌{{end}}</td>
-          <td>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</td>
-          <td>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</td>
-          <td>{{.CreatedAt.Format "2006-01-02 15:04:06"}}</td>
-          <td class="actions">
-            <a class="linklike" href="/task-flows/{{.ID}}">编辑</a>
-            <a class="linklike" href="/task-flows/{{.ID}}/flow">流程</a>
-            <button class="linklike js-run-taskflow" data-id="{{.ID}}" data-name="{{.Name}}" title="立即执行">执行</button>
-            <form method="post" action="/task-flows/{{.ID}}/toggle" style="display:inline">
-              <button class="linklike" type="submit" title="{{if .Enabled}}禁用{{else}}启用{{end}}">{{if .Enabled}}禁用{{else}}启用{{end}}</button>
-            </form>
-            <button class="linklike js-delete" data-id="{{.ID}}" data-name="{{.Name}}" title="删除">删除</button>
-          </td>
-        </tr>
-      {{end}}
-      {{end}}
-      </tbody>
-    </table>
-  </div>
+      <!-- 搜索和过滤 -->
+      {{template "table_filter" .}}
+
+      <!-- 任务流列表 -->
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive" style="min-width: 1200px;">
+            <table class="table table-hover mb-0" id="flowTable" style="min-width: 1200px;">
+              <thead class="table-light">
+                <tr>
+                  <th width="4%">ID</th>
+                  <th width="11%">名称</th>
+                  <th width="18%">描述</th>
+                  <th width="11%">调度(CRON)</th>
+                  <th width="6%">启用</th>
+                  <th width="8%">创建人</th>
+                  <th width="8%">最后操作人</th>
+                  <th width="12%">创建时间</th>
+                  <th width="22%">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{if .Flows}}
+                {{range .Flows}}
+                <tr data-id="{{.ID}}" 
+                    data-name="{{.Name}}" 
+                    data-enabled="{{if .Enabled}}1{{else}}0{{end}}">
+                  <td class="fw-semibold">{{.ID}}</td>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      <i class="bi bi-diagram-3 me-2 text-muted"></i>
+                      <span class="fw-medium">{{.Name}}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="text-muted">{{.Description}}</span>
+                  </td>
+                  <td>
+                    <code class="small">{{.CronExpr}}</code>
+                  </td>
+                  <td>
+                    {{if .Enabled}}
+                      <span class="badge bg-success">已启用</span>
+                    {{else}}
+                      <span class="badge bg-secondary">未启用</span>
+                    {{end}}
+                  </td>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      <i class="bi bi-person me-1 text-muted"></i>
+                      <span>{{if .CreatedByName}}{{.CreatedByName}}{{else}}系统{{end}}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      <i class="bi bi-person me-1 text-muted"></i>
+                      <span>{{if .UpdatedByName}}{{.UpdatedByName}}{{else}}系统{{end}}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <small class="text-muted">{{.CreatedAt.Format "2006-01-02 15:04:06"}}</small>
+                  </td>
+                  <td>
+                    <div class="d-flex flex-wrap gap-1">
+                      <a href="/task-flows/{{.ID}}" 
+                         class="btn btn-outline-primary btn-sm" 
+                         title="编辑任务流">
+                        <i class="bi bi-pencil me-1"></i>编辑
+                      </a>
+                      <a href="/task-flows/{{.ID}}/flow" 
+                         class="btn btn-outline-info btn-sm" 
+                         title="管理流程">
+                        <i class="bi bi-diagram-2 me-1"></i>流程
+                      </a>
+                      <button type="button" 
+                              class="btn btn-outline-success btn-sm" 
+                              title="立即执行"
+                              onclick="showRunConfirm('任务流 \'{{.Name}}\'', '/task-flows/{{.ID}}/run', null, '任务流将按照配置的步骤顺序立即执行。')">
+                        <i class="bi bi-play me-1"></i>执行
+                      </button>
+                      <button type="button" 
+                              class="btn btn-outline-{{if .Enabled}}warning{{else}}success{{end}} btn-sm" 
+                              title="{{if .Enabled}}禁用{{else}}启用{{end}}"
+                              onclick="showToggleConfirm('任务流 \'{{.Name}}\'', '/task-flows/{{.ID}}/toggle', {{if .Enabled}}false{{else}}true{{end}}, null, '{{if .Enabled}}禁用后任务流将停止调度，但配置会被保留。{{else}}启用后任务流将按照CRON表达式自动调度执行。{{end}}')">
+                        <i class="bi bi-{{if .Enabled}}pause{{else}}play{{end}} me-1"></i>{{if .Enabled}}禁用{{else}}启用{{end}}
+                      </button>
+                      <button type="button" 
+                              class="btn btn-outline-danger btn-sm" 
+                              title="删除任务流"
+                              onclick="showDeleteConfirm('任务流 \'{{.Name}}\'', '/task-flows/{{.ID}}')">
+                        <i class="bi bi-trash me-1"></i>删除
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {{end}}
+                {{else}}
+                <tr>
+                  <td colspan="9" class="text-center text-muted py-5">
+                    <i class="bi bi-inbox display-4 d-block mb-3"></i>
+                    <h5>暂无任务流</h5>
+                    <p class="mb-0">点击"新建任务流"开始创建您的第一个任务流</p>
+                  </td>
+                </tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 </div>
 
+
+
 <script>
+// 搜索和过滤功能
 document.addEventListener('DOMContentLoaded', function() {
-  createTableFilter('flowTable', 'q', 'enableFilter', {
-    searchFields: ['name', 'id'],
-    filterField: 'enabled',
-    emptyText: '暂无任务流'
-  });
+  // 配置过滤选项
+  const filterSelect = document.getElementById('filterSelect');
+  const searchInput = document.getElementById('searchInput');
   
-  // 初始化删除按钮
-  initDeleteButtons('flowTable', '/task-flows/{id}', '任务流');
+  // 设置搜索框占位符
+  searchInput.placeholder = '搜索任务流名称';
   
-  // 初始化执行按钮
-  initRunTaskFlowButtons();
-});
-
-function initRunTaskFlowButtons() {
-  document.querySelectorAll('.js-run-taskflow').forEach(button => {
-    button.addEventListener('click', function(e) {
-      e.preventDefault();
-      const flowId = this.getAttribute('data-id');
-      const flowName = this.getAttribute('data-name');
+  // 设置过滤选项
+  filterSelect.innerHTML = `
+    <option value="">全部</option>
+    <option value="1">已启用</option>
+    <option value="0">未启用</option>
+  `;
+  
+  // 使用通用过滤组件
+  initTableFilter({
+    tableId: 'flowTable',
+    searchColumns: [1], // 只搜索名称
+    filterColumn: null, // 不使用默认的启用状态列过滤
+    customFilter: function(row, searchTerm, filterValue) {
+      // 搜索过滤
+      let matchesSearch = true;
+      if (searchTerm) {
+        const name = row.cells[1].textContent.toLowerCase();
+        matchesSearch = name.includes(searchTerm.toLowerCase());
+      }
       
-      runTaskFlow(flowId, flowName);
-    });
-  });
-}
-
-function runTaskFlow(flowId, flowName) {
-  fetch(`/task-flows/${flowId}/run`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+      // 启用状态过滤：检查data-enabled属性
+      let matchesFilter = true;
+      if (filterValue) {
+        const enabled = row.getAttribute('data-enabled');
+        matchesFilter = enabled === filterValue;
+      }
+      
+      return matchesSearch && matchesFilter;
     }
-  })
-  .then(response => response.json())
-  .then(data => {
-    // 直接跳转到执行日志页面
-    window.location.href = `/flow-logs`;
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    alert('执行失败: ' + error.message);
   });
-}
+  
+  
+  
+});
 </script>
 
 {{template "footer" .}}

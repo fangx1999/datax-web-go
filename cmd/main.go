@@ -46,8 +46,7 @@ func setupRouter(ct *controllers.Controller) *gin.Engine {
 	r := gin.Default()
 	// 加载模板
 	r.LoadHTMLGlob("templates/**/*")
-	// 提供静态文件
-	r.Static("/static", "./static")
+	// 注意：不再需要静态文件服务，因为使用 Bootstrap 5 CDN
 	// 认证路由
 	r.GET("/login", ct.ShowLogin)
 	r.POST("/login", ct.DoLogin)
@@ -82,14 +81,7 @@ func setupRouter(ct *controllers.Controller) *gin.Engine {
 	r.GET("/data-sources", ct.MustLogin(), ct.DSList)
 	r.POST("/data-sources", ct.MustLogin(), ct.DSCreate)
 	// 支持内联编辑的 JSON 获取：/data-sources/:id?format=json
-	r.GET("/data-sources/:id", ct.MustLogin(), func(c *gin.Context) {
-		if c.Query("format") == "json" {
-			ct.DSGetOneJSON(c)
-			return
-		}
-		// 默认重定向到列表页
-		c.Redirect(302, "/data-sources")
-	})
+	r.GET("/data-sources/:id", ct.MustLogin(), ct.DSGetOneJSON)
 	r.POST("/data-sources/:id", ct.MustLogin(), ct.DSUpdate)
 	r.DELETE("/data-sources/:id", ct.MustLogin(), ct.DSDelete)
 	r.POST("/data-sources/test", ct.MustLogin(), ct.DSConnTest)

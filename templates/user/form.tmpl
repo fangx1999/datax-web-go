@@ -1,51 +1,143 @@
 {{define "user/form.tmpl"}}
 {{template "header" .}}
+{{template "common/alert.tmpl" .}}
 
-<div class="page">
-    <div class="toolbar">
-        <h1 class="h1">新建用户</h1>
-    </div>
+<div>
+  <!-- 页面标题 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+      <i class="bi bi-person-plus me-2"></i>新建用户
+    </h1>
+    <a href="/admin/users" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>返回列表
+    </a>
+  </div>
 
-    <div class="box">
-        {{if .Error}}
-        <div class="alert">{{.Error}}</div>
-        {{end}}
-        <form method="post" action="/admin/users">
-            <div class="grid-2">
-                <div class="field">
-                    <label for="username">用户名</label>
-                    <input id="username" name="username" type="text" required>
-                </div>
+  <div class="card">
+    <div class="card-body">
+      {{if .Error}}
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>{{.Error}}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {{end}}
 
-                <div class="field">
-                    <label for="role">角色</label>
-                    <select id="role" name="role" required>
-                        <option value="user">普通用户</option>
-                        <option value="admin">管理员</option>
-                    </select>
-                </div>
-
-                <div class="field">
-                    <label for="password">初始密码</label>
-                    <input id="password" name="password" type="text" placeholder="留空则自动生成随机密码">
-                </div>
-
-                <div class="field">
-                    <label for="disabled">状态</label>
-                    <select id="disabled" name="disabled">
-                        <option value="0" selected>启用</option>
-                        <option value="1">禁用</option>
-                    </select>
-                </div>
+      <form method="post" action="/admin/users" id="userForm">
+        
+        <div class="row">
+          <div class="col-md-6">
+            <div class="mb-3">
+              <label for="username" class="form-label">用户名 <span class="text-danger">*</span></label>
+              <input type="text" 
+                     class="form-control" 
+                     id="username" 
+                     name="username" 
+                     placeholder="admin"
+                     required>
+              <div class="form-text">请输入用户名</div>
             </div>
-
-            <div class="row" style="margin-top:12px">
-                <button class="btn primary" type="submit">创建</button>
-                <a class="btn" href="/admin/users">返回</a>
+          </div>
+          <div class="col-md-6">
+            <div class="mb-3">
+              <label for="role" class="form-label">角色 <span class="text-danger">*</span></label>
+              <select class="form-select" id="role" name="role" required>
+                <option value="">请选择角色...</option>
+                <option value="admin">管理员</option>
+                <option value="user">普通用户</option>
+              </select>
             </div>
-        </form>
+          </div>
+        </div>
+        
+        <div class="row">
+          <div class="col-md-6">
+            <div class="mb-3">
+              <label for="password" class="form-label">
+                密码 <span class="text-danger">*</span>
+              </label>
+              <input type="password" 
+                     class="form-control" 
+                     id="password" 
+                     name="password" 
+                     autocomplete="new-password"
+                     placeholder="请输入密码"
+                     required>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="mb-3">
+              <label for="confirm_password" class="form-label">确认密码 <span class="text-danger">*</span></label>
+              <input type="password" 
+                     class="form-control" 
+                     id="confirm_password" 
+                     name="confirm_password" 
+                     autocomplete="new-password"
+                     placeholder="请再次输入密码"
+                     required>
+            </div>
+          </div>
+        </div>
+        
+
+        <!-- 操作按钮 -->
+        <div class="d-flex justify-content-end gap-2">
+          <button type="button" 
+                  class="btn btn-secondary" 
+                  onclick="history.back()">
+            <i class="bi bi-x-circle me-1"></i>取消
+          </button>
+          <button type="submit" 
+                  class="btn btn-primary">
+            <i class="bi bi-check me-1"></i>创建
+          </button>
+        </div>
+      </form>
     </div>
+  </div>
 </div>
+
+<script>
+// 表单验证
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('userForm');
+  const password = document.getElementById('password');
+  const confirmPassword = document.getElementById('confirm_password');
+  
+  form.addEventListener('submit', function(e) {
+    const username = document.getElementById('username').value.trim();
+    const role = document.getElementById('role').value;
+    const passwordValue = password.value;
+    const confirmPasswordValue = confirmPassword.value;
+    
+    if (!username) {
+      e.preventDefault();
+      showAlert('请输入用户名', 'warning');
+      return;
+    }
+    
+    if (!role) {
+      e.preventDefault();
+      showAlert('请选择角色', 'warning');
+      return;
+    }
+    
+    // 密码验证
+    if (passwordValue !== confirmPasswordValue) {
+      e.preventDefault();
+      showAlert('两次输入的密码不一致', 'warning');
+      return;
+    }
+    
+    if (passwordValue.length < 6) {
+      e.preventDefault();
+      showAlert('密码长度不能少于6位', 'warning');
+      return;
+    }
+  });
+});
+
+</script>
+
 
 {{template "footer" .}}
 {{end}}

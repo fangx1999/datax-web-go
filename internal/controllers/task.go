@@ -12,7 +12,8 @@ import (
 // TaskList 显示所有任务
 func (ct *Controller) TaskList(c *gin.Context) {
 	rows, _ := ct.db.Query(`
-		SELECT t.id, t.name, tf.name, tf.id, 
+		SELECT t.id, t.name, 
+		       COALESCE(tf.name, '') as flow_name,
 		       COALESCE(uc.username, '系统') as created_by_name,
 		       COALESCE(uu.username, '系统') as updated_by_name,
 		       t.created_at, t.updated_at
@@ -27,7 +28,8 @@ func (ct *Controller) TaskList(c *gin.Context) {
 	var tasks []models.Task
 	for rows.Next() {
 		var r models.Task
-		rows.Scan(&r.ID, &r.Name, &r.FlowName, &r.FlowID, &r.CreatedByName, &r.UpdatedByName, &r.CreatedAt, &r.UpdatedAt)
+		err := rows.Scan(&r.ID, &r.Name, &r.FlowName, &r.CreatedByName, &r.UpdatedByName, &r.CreatedAt, &r.UpdatedAt)
+		fmt.Println(err)
 		tasks = append(tasks, r)
 	}
 	c.HTML(200, "task/list.tmpl", gin.H{"Tasks": tasks})
@@ -116,10 +118,15 @@ func (ct *Controller) TaskCreate(c *gin.Context) {
 		return
 	}
 
-	flowID, err := strconv.Atoi(c.PostForm("flow_id"))
-	if err != nil || flowID <= 0 {
-		c.String(400, "无效的任务流ID")
-		return
+	// 任务流ID为可选，0表示独立任务
+	flowID := 0
+	if flowIDStr := c.PostForm("flow_id"); flowIDStr != "" {
+		var err error
+		flowID, err = strconv.Atoi(flowIDStr)
+		if err != nil || flowID < 0 {
+			c.String(400, "无效的任务流ID")
+			return
+		}
 	}
 
 	// 验证JSON格式
@@ -161,20 +168,23 @@ func (ct *Controller) TaskCreate(c *gin.Context) {
 		return
 	}
 
-	// 添加到任务流 - 获取下一个步骤顺序
-	var maxOrder int
-	err = tx.QueryRow("SELECT COALESCE(MAX(step_order), 0) FROM task_flow_steps WHERE flow_id=?", flowID).Scan(&maxOrder)
-	if err != nil {
-		c.String(500, "获取步骤顺序失败")
-		return
-	}
+	// 如果指定了任务流，则添加到任务流中
+	if flowID > 0 {
+		// 获取下一个步骤顺序
+		var maxOrder int
+		err = tx.QueryRow("SELECT COALESCE(MAX(step_order), 0) FROM task_flow_steps WHERE flow_id=?", flowID).Scan(&maxOrder)
+		if err != nil {
+			c.String(500, "获取步骤顺序失败")
+			return
+		}
 
-	_, err = tx.Exec(`
-		INSERT INTO task_flow_steps (flow_id, task_id, step_order)
-		VALUES (?, ?, ?)`, flowID, taskID, maxOrder+1)
-	if err != nil {
-		c.String(500, "添加任务到流程失败")
-		return
+		_, err = tx.Exec(`
+			INSERT INTO task_flow_steps (flow_id, task_id, step_order)
+			VALUES (?, ?, ?)`, flowID, taskID, maxOrder+1)
+		if err != nil {
+			c.String(500, "添加任务到流程失败")
+			return
+		}
 	}
 
 	// 提交事务

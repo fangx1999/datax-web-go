@@ -1,621 +1,866 @@
 {{define "task/new.tmpl"}}
 {{template "header" .}}
 
-<div class="page">
-    <div class="toolbar">
-        <h1 class="h1">新建任务</h1>
-        <div class="controls">
-            <a class="btn" href="/tasks">← 返回任务列表</a>
+<div>
+  <!-- 页面标题 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+      <i class="bi bi-plus-circle me-2"></i>新建任务
+    </h1>
+    <a href="/tasks" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>返回任务列表
+    </a>
+  </div>
+
+  <form id="taskForm" method="post" action="/tasks" autocomplete="off">
+    <!-- 基本信息 -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-info-circle me-2"></i>基本信息
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <label for="taskName" class="form-label">任务名称 <span class="text-danger">*</span></label>
+            <input type="text" 
+                   class="form-control" 
+                   id="taskName" 
+                   name="name" 
+                   placeholder="例如：sync_orders_daily"
+                   required>
+            <div class="form-text">建议使用有意义的名称，例如：sync_orders_daily</div>
+          </div>
+          <div class="col-md-6">
+            <label for="flowSelect" class="form-label">选择任务流（可选）</label>
+            <select class="form-select" id="flowSelect" name="flow_id">
+              <option value="">不选择任务流（独立任务）</option>
+              {{range .TaskFlows}}
+              <option value="{{.ID}}">{{.Name}}</option>
+              {{end}}
+            </select>
+            <div class="form-text">选择任务流后，新任务将自动添加到该任务流中；不选择则创建独立任务</div>
+          </div>
         </div>
+      </div>
     </div>
 
-
-    <form id="taskForm" method="post" action="/tasks" autocomplete="off">
-        <!-- 基本信息 -->
-        <div class="card card-spacing">
-            <div class="section-title">基本信息</div>
-            <div class="grid-2">
-                <div class="form-group">
-                    <label for="taskName">任务名称 *</label>
-                    <input name="name" id="taskName" required placeholder="sync_orders_daily">
-                    <small class="help">建议使用有意义的名称，例如：sync_orders_daily</small>
-                </div>
-                <div class="form-group">
-                    <label for="flowSelect">选择任务流 *</label>
-                    <select id="flowSelect" name="flow_id" required>
-                        <option value="">请选择任务流...</option>
-                        {{range .TaskFlows}}
-                        <option value="{{.ID}}">{{.Name}}</option>
-                        {{end}}
+    <!-- 数据源配置 -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-database me-2"></i>数据源配置（至少一侧为 MySQL）
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <!-- 输入数据源 -->
+          <div class="col-md-6 d-flex">
+            <div class="card border-primary w-100 d-flex flex-column">
+              <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                  <h6 class="mb-0">输入数据源</h6>
+                  <div class="col-4 col-md-3 col-lg-2">
+                    <select class="form-select form-select-sm" id="inType" onchange="toggleDataSource()">
+                      <option value="mysql">MySQL</option>
+                      <option value="ofs">OFS</option>
+                      <option value="hdfs">HDFS</option>
+                      <option value="cosn">COSN</option>
                     </select>
-                    <small class="help">选择任务流后，新任务将自动添加到该任务流中</small>
+                  </div>
                 </div>
-            </div>
-        </div>
+              </div>
+              <div class="card-body flex-grow-1">
+                <!-- MySQL 输入配置 -->
+                <div id="inMySQL">
+                  <div class="mb-3">
+                    <label class="form-label">选择 MySQL 数据源</label>
+                    <select class="form-select" id="srcMySQL">
+                      <option value="">请选择数据源...</option>
+                      {{range .MySQL}}
+                      <option value="{{.ID}}">{{.Name}}</option>
+                      {{end}}
+                    </select>
+                    <div class="form-text">从已配置的 MySQL 数据源中选择</div>
+                  </div>
+                  
+                  <div class="row">
+                    <div class="col-md-8">
+                      <div class="mb-3">
+                        <label class="form-label">数据表名</label>
+                        <div class="input-group">
+                          <input type="text" 
+                                 class="form-control" 
+                                 id="inTable"
+                                 placeholder="例如：orders_${yyyy-mm-dd}">
+                          <button type="button" 
+                                  class="btn btn-outline-secondary" 
+                                  onclick="insertPlaceholder('inTable', '${yyyy-mm-dd}')">
+                            日期
+                          </button>
+                          <button type="button" 
+                                  class="btn btn-outline-secondary" 
+                                  onclick="insertPlaceholder('inTable', '${yyyy_mm_dd}')">
+                            下划线
+                          </button>
+                        </div>
+                        <div class="form-text">支持日期占位符，执行时自动替换为当前日期</div>
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <div class="mb-3">
+                        <label class="form-label">样例日期</label>
+                        <input type="date" 
+                               class="form-control" 
+                               id="sampleDate"
+                               placeholder="例如：2025-01-15">
+                        <div class="form-text">用于加载字段时替换占位符，可不填</div>
+                      </div>
+                    </div>
+                  </div>
 
-        <!-- 数据源配置 -->
-        <div class="card card-spacing">
-            <div class="section-title">数据源配置（至少一侧为 MySQL）</div>
-            <div class="grid-2">
-                <!-- 输入数据源 -->
-                <div class="data-source-card">
-                    <div class="data-source-header">
-                        <h3 class="data-source-title">输入数据源</h3>
-                        <select id="inType" class="type-selector" onchange="toggleDataSource()">
-                            <option value="mysql">MySQL</option>
-                            <option value="ofs">OFS</option>
-                            <option value="hdfs">HDFS</option>
-                            <option value="cosn">COSN</option>
+                  <div class="mb-3">
+                    <label class="form-label">WHERE 条件（可选）</label>
+                    <input type="text" 
+                           class="form-control" 
+                           id="inWhere"
+                           placeholder="例如：dt='${yyyy-mm-dd}' AND status=1">
+                    <div class="form-text">支持占位符，例如：dt='${yyyy-mm-dd}'</div>
+                  </div>
+                </div>
+
+                <!-- 文件系统输入配置 -->
+                <div id="inFS" class="d-none">
+                  <div class="mb-3">
+                    <label class="form-label">选择存储数据源</label>
+                    <select class="form-select" id="inFSSelect">
+                      <option value="">请选择数据源...</option>
+                      {{range .OFS}}<option value="{{.ID}}" data-type="ofs">{{.Name}}</option>{{end}}
+                      {{range .HDFS}}<option value="{{.ID}}" data-type="hdfs">{{.Name}}</option>{{end}}
+                      {{range .COSN}}<option value="{{.ID}}" data-type="cosn">{{.Name}}</option>{{end}}
+                    </select>
+                  </div>
+                  
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="mb-3">
+                        <label class="form-label">文件格式</label>
+                        <select class="form-select" id="inFileType" onchange="toggleDataSource()">
+                          <option value="orc">ORC</option>
+                          <option value="text">Text</option>
                         </select>
+                      </div>
                     </div>
-
-                    <!-- MySQL 输入配置 -->
-                    <div id="inMySQL">
-                        <div class="form-group">
-                            <label for="srcMySQL">选择 MySQL 数据源</label>
-                            <select id="srcMySQL">
-                                <option value="">请选择数据源...</option>
-                                {{range .MySQL}}
-                                <option value="{{.ID}}">{{.Name}}</option>
-                                {{end}}
-                            </select>
-                            <small class="help">从已配置的 MySQL 数据源中选择</small>
+                    <div class="col-md-6">
+                      <div class="mb-3">
+                        <label class="form-label">读取列索引（0基，逗号分隔）</label>
+                        <div class="input-group">
+                          <input type="text" 
+                                 class="form-control" 
+                                 id="inIndexes"
+                                 placeholder="例如：0,1,2,3">
+                          <button type="button" 
+                                  class="btn btn-outline-secondary" 
+                                  onclick="generateIndexes()">
+                            按列数生成
+                          </button>
                         </div>
-
-                        <div class="form-group">
-                            <label for="inTable">数据表名（支持日期占位符）</label>
-                            <div class="row">
-                                <input id="inTable" placeholder="table_${yyyy-mm-dd}" style="flex: 1;">
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inTable', '\${yyyy-mm-dd}')">日期</button>
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inTable', '\${yyyy_mm_dd}')">下划线</button>
-                            </div>
-                            <small class="help">支持日期占位符，执行时自动替换为当前日期</small>
-                        </div>
-
-                        <div class="grid-2">
-                            <div class="form-group">
-                                <label for="sampleDate">样例日期（用于加载字段）</label>
-                                <input id="sampleDate" placeholder="2025-09-11" type="date">
-                                <small class="help">用于预览时替换占位符，可不填</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="inWhere">WHERE 条件（可选）</label>
-                                <input id="inWhere" placeholder="dt='${yyyy-mm-dd}' AND id>0">
-                                <small class="help">支持占位符，例如：dt='${yyyy-mm-dd}'</small>
-                            </div>
-                        </div>
+                      </div>
                     </div>
+                  </div>
 
-                    <!-- 文件系统输入配置 -->
-                    <div id="inFS" style="display:none;">
-                        <div class="form-group">
-                            <label for="inFSSelect">选择存储数据源</label>
-                            <select id="inFSSelect">
-                                <option value="">请选择数据源...</option>
-                                {{range .OFS}}<option value="{{.ID}}" data-type="ofs">{{.Name}}</option>{{end}}
-                                {{range .HDFS}}<option value="{{.ID}}" data-type="hdfs">{{.Name}}</option>{{end}}
-                                {{range .COSN}}<option value="{{.ID}}" data-type="cosn">{{.Name}}</option>{{end}}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="inFileType">文件格式</label>
-                            <select id="inFileType" onchange="toggleDataSource()">
-                                <option value="orc">ORC</option>
-                                <option value="parquet">Parquet</option>
-                                <option value="text">Text</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="inPath">数据文件路径（支持日期占位符）</label>
-                            <div class="row">
-                                <input id="inPath" placeholder="/data/ods/orders/dt=${yyyy-mm-dd}" style="flex: 1;">
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inPath', '\${yyyy-mm-dd}')">日期</button>
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inPath', '\${yyyy_mm_dd}')">下划线</button>
-                            </div>
-                            <small class="help">完整的存储路径，支持日期占位符</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="inFilename">输入文件名（可选，支持日期占位符）</label>
-                            <div class="row">
-                                <input id="inFilename" placeholder="orders_${yyyy-mm-dd}.orc" style="flex: 1;">
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inFilename', '\${yyyy-mm-dd}')">日期</button>
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('inFilename', '\${yyyy_mm_dd}')">下划线</button>
-                            </div>
-                            <small class="help">指定输入文件名，留空则读取路径下所有文件。支持日期占位符</small>
-                        </div>
-
-                        <div id="inDelimiterBox" style="display:none;" class="form-group">
-                            <label for="inDelimiter">文本分隔符 <span style="color: red;">*</span></label>
-                            <input id="inDelimiter" value="," placeholder="输入分隔符，如逗号(,)、制表符(\t)等" required>
-                            <small class="help">文件系统输入时必填，常用分隔符：逗号(,)、制表符(\t)</small>
-                        </div>
-
-                        <div id="inIdxBox" class="form-group">
-                            <label for="inIndexes">读取列索引（0基，逗号分隔）</label>
-                            <div class="row">
-                                <input id="inIndexes" placeholder="0,1,2" style="flex: 1;">
-                                <button class="btn" type="button" onclick="generateIndexes()">按列数生成</button>
-                            </div>
-                            <small class="help">ORC/Parquet 需要指定列索引，列数取自"被选中的 MySQL 列"</small>
-                        </div>
+                  <div class="mb-3">
+                    <label class="form-label">数据文件路径（支持日期占位符）</label>
+                    <div class="input-group">
+                      <input type="text" 
+                             class="form-control" 
+                             id="inPath"
+                             placeholder="例如：/data/ods/orders/dt=${yyyy-mm-dd}">
+                      <button type="button" 
+                              class="btn btn-outline-secondary" 
+                              onclick="insertPlaceholder('inPath', '${yyyy-mm-dd}')">
+                        日期
+                      </button>
+                      <button type="button" 
+                              class="btn btn-outline-secondary" 
+                              onclick="insertPlaceholder('inPath', '${yyyy_mm_dd}')">
+                        下划线
+                      </button>
                     </div>
+                    <div class="form-text">完整的存储路径，支持日期占位符</div>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label">输入文件名（可选，支持日期占位符）</label>
+                    <div class="input-group">
+                      <input type="text" 
+                             class="form-control" 
+                             id="inFilename"
+                             placeholder="例如：orders_${yyyy-mm-dd}.orc">
+                      <button type="button" 
+                              class="btn btn-outline-secondary" 
+                              onclick="insertPlaceholder('inFilename', '${yyyy-mm-dd}')">
+                        日期
+                      </button>
+                      <button type="button" 
+                              class="btn btn-outline-secondary" 
+                              onclick="insertPlaceholder('inFilename', '${yyyy_mm_dd}')">
+                        下划线
+                      </button>
+                    </div>
+                    <div class="form-text">指定输入文件名，留空则读取路径下所有文件</div>
+                  </div>
+
+                  <div id="inDelimiterBox" class="d-none mb-3">
+                    <label class="form-label">文本分隔符 <span class="text-danger">*</span></label>
+                    <input type="text" 
+                           class="form-control" 
+                           id="inDelimiter" 
+                           value=","
+                           placeholder="例如：逗号(,)、制表符(\t)等"
+                           required>
+                    <div class="form-text">文件系统输入时必填，常用分隔符：逗号(,)、制表符(\t)</div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 输出数据源 -->
+          <div class="col-md-6 d-flex">
+            <div class="card border-success w-100 d-flex flex-column">
+              <div class="card-header bg-success text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                  <h6 class="mb-0">输出数据源</h6>
+                  <div class="col-4 col-md-3 col-lg-2">
+                    <select class="form-select form-select-sm" id="outType" onchange="toggleDataSource()">
+                      <option value="ofs">OFS</option>
+                      <option value="hdfs">HDFS</option>
+                      <option value="cosn">COSN</option>
+                      <option value="mysql">MySQL</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="card-body flex-grow-1">
+                <!-- MySQL 输出配置 -->
+                <div id="outMySQL" class="d-none">
+                  <div class="mb-3">
+                    <label class="form-label">选择目标 MySQL 数据源</label>
+                    <select class="form-select" id="tgtMySQL">
+                      <option value="">请选择数据源...</option>
+                      {{range .MySQL}}
+                      <option value="{{.ID}}">{{.Name}}</option>
+                      {{end}}
+                    </select>
+                    <div class="form-text">从已配置的 MySQL 数据源中选择</div>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label class="form-label">目标表名（支持日期占位符）</label>
+                    <div class="input-group">
+                      <input type="text" 
+                             class="form-control" 
+                             id="outTable"
+                             placeholder="例如：dw_orders_${yyyy-mm-dd}">
+                      <button type="button" 
+                              class="btn btn-outline-secondary" 
+                              onclick="insertPlaceholder('outTable', '${yyyy-mm-dd}')">
+                        日期
+                      </button>
+                      <button type="button" 
+                              class="btn btn-outline-secondary" 
+                              onclick="insertPlaceholder('outTable', '${yyyy_mm_dd}')">
+                        下划线
+                      </button>
+                    </div>
+                    <div class="form-text">数据将写入此表，支持日期占位符</div>
+                  </div>
                 </div>
 
-                <!-- 输出数据源 -->
-                <div class="data-source-card">
-                    <div class="data-source-header">
-                        <h3 class="data-source-title">输出数据源</h3>
-                        <select id="outType" class="type-selector" onchange="toggleDataSource()">
-                            <option value="ofs">OFS</option>
-                            <option value="hdfs">HDFS</option>
-                            <option value="cosn">COSN</option>
-                            <option value="mysql">MySQL</option>
+                <!-- 文件系统输出配置 -->
+                <div id="outFS">
+                  <div class="mb-3">
+                    <label class="form-label">选择目标存储数据源</label>
+                    <select class="form-select" id="outFSSelect">
+                      <option value="">请选择数据源...</option>
+                      {{range .OFS}}<option value="{{.ID}}" data-type="ofs">{{.Name}}</option>{{end}}
+                      {{range .HDFS}}<option value="{{.ID}}" data-type="hdfs">{{.Name}}</option>{{end}}
+                      {{range .COSN}}<option value="{{.ID}}" data-type="cosn">{{.Name}}</option>{{end}}
+                    </select>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label class="form-label">输出文件路径</label>
+                    <div class="input-group">
+                      <input type="text" 
+                             class="form-control" 
+                             id="outPath"
+                             placeholder="例如：/export/orders/dt=${yyyy-mm-dd}">
+                      <button type="button" 
+                              class="btn btn-outline-secondary" 
+                              onclick="insertPlaceholder('outPath', '${yyyy-mm-dd}')">
+                        日期
+                      </button>
+                      <button type="button" 
+                              class="btn btn-outline-secondary" 
+                              onclick="insertPlaceholder('outPath', '${yyyy_mm_dd}')">
+                        下划线
+                      </button>
+                    </div>
+                    <div class="form-text">完整的存储路径，支持日期占位符</div>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label">输出文件名</label>
+                    <div class="input-group">
+                      <input type="text" 
+                             class="form-control" 
+                             id="outFilename"
+                             placeholder="例如：orders_${yyyy-mm-dd}.orc">
+                      <button type="button" 
+                              class="btn btn-outline-secondary" 
+                              onclick="insertPlaceholder('outFilename', '${yyyy-mm-dd}')">
+                        日期
+                      </button>
+                      <button type="button" 
+                              class="btn btn-outline-secondary" 
+                              onclick="insertPlaceholder('outFilename', '${yyyy_mm_dd}')">
+                        下划线
+                      </button>
+                    </div>
+                    <div class="form-text">指定输出文件名，留空则使用默认命名</div>
+                  </div>
+
+                  <div class="row">
+                    <div class="col-md-3">
+                      <div class="mb-3">
+                        <label class="form-label">输出文件格式</label>
+                        <select class="form-select" id="outFileType" onchange="toggleDataSource()">
+                          <option value="orc">ORC</option>
+                          <option value="text">Text</option>
                         </select>
+                      </div>
                     </div>
-
-                    <!-- MySQL 输出配置 -->
-                    <div id="outMySQL" style="display:none;">
-                        <div class="form-group">
-                            <label for="tgtMySQL">选择目标 MySQL 数据源</label>
-                            <select id="tgtMySQL">
-                                <option value="">请选择数据源...</option>
-                                {{range .MySQL}}
-                                <option value="{{.ID}}">{{.Name}}</option>
-                                {{end}}
-                            </select>
-                            <small class="help">从已配置的 MySQL 数据源中选择</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="outTable">目标表名（支持日期占位符）</label>
-                            <div class="row">
-                                <input id="outTable" placeholder="dw_orders_${yyyy-mm-dd}" style="flex: 1;">
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outTable', '\${yyyy-mm-dd}')">日期</button>
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outTable', '\${yyyy_mm_dd}')">下划线</button>
-                            </div>
-                            <small class="help">数据将写入此表，支持日期占位符</small>
-                        </div>
+                    <div class="col-md-3">
+                      <div id="outDelimiterBox" class="d-none mb-3">
+                        <label class="form-label">文本分隔符 <span class="text-danger">*</span></label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="outDelimiter" 
+                               value=","
+                               placeholder="例如：逗号(,)、制表符(\t)等"
+                               required>
+                      </div>
                     </div>
-
-                    <!-- 文件系统输出配置 -->
-                    <div id="outFS">
-                        <div class="form-group">
-                            <label for="outFSSelect">选择目标存储数据源</label>
-                            <select id="outFSSelect">
-                                <option value="">请选择数据源...</option>
-                                {{range .OFS}}<option value="{{.ID}}" data-type="ofs">{{.Name}}</option>{{end}}
-                                {{range .HDFS}}<option value="{{.ID}}" data-type="hdfs">{{.Name}}</option>{{end}}
-                                {{range .COSN}}<option value="{{.ID}}" data-type="cosn">{{.Name}}</option>{{end}}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="outFileType">输出文件格式</label>
-                            <select id="outFileType" onchange="toggleDataSource()">
-                                <option value="orc">ORC</option>
-                                <option value="parquet">Parquet</option>
-                                <option value="text">Text</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="outPath">输出文件路径（支持日期占位符）</label>
-                            <div class="row">
-                                <input id="outPath" placeholder="/export/orders/dt=${yyyy-mm-dd}" style="flex: 1;">
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outPath', '\${yyyy-mm-dd}')">日期</button>
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outPath', '\${yyyy_mm_dd}')">下划线</button>
-                            </div>
-                            <small class="help">完整的存储路径，支持日期占位符</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="outFilename">输出文件名（可选，支持日期占位符）</label>
-                            <div class="row">
-                                <input id="outFilename" placeholder="orders_${yyyy-mm-dd}.orc" style="flex: 1;">
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outFilename', '\${yyyy-mm-dd}')">日期</button>
-                                <button class="placeholder-btn" type="button" onclick="insertPlaceholderTo('outFilename', '\${yyyy_mm_dd}')">下划线</button>
-                            </div>
-                            <small class="help">指定输出文件名，留空则使用默认命名。支持日期占位符</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="outWriteMode">写入模式</label>
-                            <select id="outWriteMode">
-                                <option value="nonConflict">nonConflict - 文件存在时报错（默认）</option>
-                                <option value="append">append - 直接追加，不做任何处理</option>
-                                <option value="truncate">truncate - 文件存在时先删除后写入</option>
-                            </select>
-                            <small class="help">选择文件写入模式，控制文件冲突时的处理方式</small>
-                        </div>
-
-                        <div id="outDelimiterBox" style="display:none;" class="form-group">
-                            <label for="outDelimiter">文本分隔符 <span style="color: red;">*</span></label>
-                            <input id="outDelimiter" value="\\t" placeholder="输入分隔符，如逗号(,)、制表符(\t)等" required>
-                            <small class="help">文件系统输出时必填，默认为制表符(\t)，可根据需要修改</small>
-                        </div>
+                    <div class="col-md-6">
+                      <div class="mb-3">
+                        <label class="form-label">写入模式</label>
+                        <select class="form-select" id="outWriteMode">
+                          <option value="nonConflict">nonConflict - 文件存在时报错（默认）</option>
+                          <option value="append">append - 直接追加，不做任何处理</option>
+                          <option value="truncate">truncate - 文件存在时先删除后写入</option>
+                        </select>
+                      </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                  </div>
 
-        <!-- 字段选择 -->
-        <div class="card card-spacing">
-            <div class="section-title">选择数据字段（两端至少一侧为 MySQL）</div>
-            <div class="form-group">
-                <div class="row" style="margin-bottom: 12px;">
-                    <button class="btn primary" type="button" onclick="loadColumns()">从基准 MySQL 加载字段</button>
-                    <button class="btn" type="button" id="btnSelectAll" style="display:none;" onclick="toggleAll(true)">全选</button>
-                    <button class="btn" type="button" id="btnSelectNone" style="display:none;" onclick="toggleAll(false)">全不选</button>
-                    <span id="colHint" class="help">当输入是 MySQL 时以输入端为基准，否则以输出端（MySQL）为基准。</span>
                 </div>
-                <div id="colsBox" class="cols">
-                    <div class="empty-state">尚未加载字段，请点击按钮加载</div>
-                </div>
+              </div>
             </div>
+          </div>
         </div>
+      </div>
+    </div>
 
-        <!-- 预览 -->
-        <div class="card card-spacing">
-            <div class="section-title">预览与编辑 DataX 配置</div>
-            <div class="form-group">
-                <div class="row">
-                    <button id="btnPreview" class="btn primary" type="button" onclick="generatePreview()">生成/刷新预览</button>
-                    <button class="btn" type="button" onclick="formatJSON()">格式化 JSON</button>
-                    <button class="btn" type="button" onclick="validateJSON()">校验配置</button>
-                    <span id="pvStatus" class="help"></span>
-                </div>
-                <textarea id="jsonArea" style="display:none;margin-top:12px;height:360px;width:100%;" spellcheck="false" placeholder="生成的 DataX 配置将显示在这里..."></textarea>
-            </div>
+    <!-- 字段选择 -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-list-check me-2"></i>选择数据字段（两端至少一侧为 MySQL）
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="d-flex gap-2 mb-3">
+          <button type="button" 
+                  class="btn btn-primary" 
+                  onclick="loadColumns()"
+                  id="loadColumnsBtn">
+            <i class="bi bi-arrow-clockwise me-1"></i>从基准 MySQL 加载字段
+          </button>
+          <button type="button" 
+                  class="btn btn-outline-secondary" 
+                  onclick="toggleAllColumns(true)"
+                  id="selectAllBtn"
+                  class="d-none">
+            全选
+          </button>
+          <button type="button" 
+                  class="btn btn-outline-secondary d-none" 
+                  onclick="toggleAllColumns(false)"
+                  id="selectNoneBtn">
+            全不选
+          </button>
         </div>
+        
+        <div id="colsBox" class="row g-2">
+          <div class="col-12 text-center text-muted py-4">
+            <i class="bi bi-inbox display-4 d-block mb-2"></i>
+            <p>尚未加载字段，请点击按钮加载</p>
+          </div>
+        </div>
+      </div>
+    </div>
 
-        <!-- 操作按钮 -->
-        <div class="row" style="justify-content:flex-end;gap:12px;margin-top:20px">
-            <button class="btn" type="button" onclick="history.back()">取消</button>
-            <button class="btn primary" id="btnSave" disabled onclick="saveTask()">保存任务</button>
+    <!-- 预览 -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-eye me-2"></i>预览与编辑 DataX 配置
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="d-flex gap-2 mb-3">
+          <button type="button" 
+                  class="btn btn-primary" 
+                  onclick="generatePreview()"
+                  id="previewBtn">
+            <i class="bi bi-arrow-clockwise me-1"></i>生成/刷新预览
+          </button>
+          <button type="button" 
+                  class="btn btn-outline-secondary d-none" 
+                  onclick="formatJSON()"
+                  id="formatBtn">
+            格式化 JSON
+          </button>
+          <button type="button" 
+                  class="btn btn-outline-secondary d-none" 
+                  onclick="validateJSON()"
+                  id="validateBtn">
+            校验配置
+          </button>
         </div>
-    </form>
+        
+        <div id="previewContainer" class="d-none">
+          <label class="form-label">DataX 配置预览</label>
+          <textarea class="form-control font-monospace" 
+                    rows="15" 
+                    id="jsonArea"
+                    name="datax_json"
+                    placeholder="点击&quot;生成/刷新预览&quot;按钮生成DataX配置JSON"></textarea>
+        </div>
+        
+        <div id="previewStatus" class="mt-2"></div>
+      </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="d-flex justify-content-end gap-2">
+      <button type="button" 
+              class="btn btn-secondary" 
+              onclick="history.back()">
+        <i class="bi bi-x-circle me-1"></i>取消
+      </button>
+      <button type="submit" 
+              class="btn btn-primary" 
+              id="saveBtn"
+              disabled>
+        <i class="bi bi-save me-1"></i>保存任务
+      </button>
+    </div>
+  </form>
 </div>
 
 <script>
 // 插入占位符到指定输入框
-function insertPlaceholderTo(inputId, token) {
-    const input = document.getElementById(inputId);
-    if (input && (input.tagName === 'INPUT' || input.tagName === 'TEXTAREA')) {
-        const start = input.selectionStart || 0;
-        const end = input.selectionEnd || 0;
-        input.value = input.value.slice(0, start) + token + input.value.slice(end);
-        input.focus();
-        input.setSelectionRange(start + token.length, start + token.length);
-    }
-}
-
-
-
-// 生成列索引
-function generateIndexes() {
-    const checkedBoxes = document.querySelectorAll('#colsBox input[type="checkbox"]:checked');
-    if (checkedBoxes.length <= 0) {
-        alert('请先加载并勾选列');
-        return;
-    }
-    
-    const indexes = Array.from({length: checkedBoxes.length}, (_, i) => i);
-    const inIndexes = document.getElementById('inIndexes');
-    if (inIndexes) {
-        inIndexes.value = indexes.join(',');
-    }
+function insertPlaceholder(inputId, token) {
+  const input = document.getElementById(inputId);
+  if (input) {
+    const start = input.selectionStart || 0;
+    const end = input.selectionEnd || 0;
+    input.value = input.value.slice(0, start) + token + input.value.slice(end);
+    input.focus();
+    input.setSelectionRange(start + token.length, start + token.length);
+  }
 }
 
 // 切换数据源类型
 function toggleDataSource() {
-    const inType = document.getElementById('inType').value;
-    const outType = document.getElementById('outType').value;
-    
-    // 显示/隐藏配置区域
-    document.getElementById('inMySQL').style.display = inType === 'mysql' ? 'block' : 'none';
-    document.getElementById('inFS').style.display = inType === 'mysql' ? 'none' : 'block';
-    document.getElementById('outMySQL').style.display = outType === 'mysql' ? 'block' : 'none';
-    document.getElementById('outFS').style.display = outType === 'mysql' ? 'none' : 'block';
-    
-    // 显示/隐藏分隔符框 - 文件系统类型时始终显示
-    document.getElementById('inDelimiterBox').style.display = inType !== 'mysql' ? 'block' : 'none';
-    document.getElementById('outDelimiterBox').style.display = outType !== 'mysql' ? 'block' : 'none';
-    
-    // 筛选数据源选项
-    filterOptions('inFSSelect', inType);
-    filterOptions('outFSSelect', outType);
-    
-    // 验证至少一端为 MySQL
-    const isValid = inType === 'mysql' || outType === 'mysql';
-    document.getElementById('btnPreview').disabled = !isValid;
-    const pvStatus = document.getElementById('pvStatus');
-    pvStatus.textContent = isValid ? '' : '至少一端必须为 MySQL';
-    pvStatus.className = isValid ? 'help' : 'help warn';
-    
-    clearPreview();
+  const { inType, outType } = getDataSourceTypes();
+  
+  // 显示/隐藏配置区域
+  const inMySQL = document.getElementById('inMySQL');
+  const inFS = document.getElementById('inFS');
+  const outMySQL = document.getElementById('outMySQL');
+  const outFS = document.getElementById('outFS');
+  
+  if (inType === 'mysql') {
+    inMySQL.classList.remove('d-none');
+    inFS.classList.add('d-none');
+  } else {
+    inMySQL.classList.add('d-none');
+    inFS.classList.remove('d-none');
+  }
+  
+  if (outType === 'mysql') {
+    outMySQL.classList.remove('d-none');
+    outFS.classList.add('d-none');
+  } else {
+    outMySQL.classList.add('d-none');
+    outFS.classList.remove('d-none');
+  }
+  
+  // 显示/隐藏分隔符框
+  const inDelimiterBox = document.getElementById('inDelimiterBox');
+  const outDelimiterBox = document.getElementById('outDelimiterBox');
+  
+  if (inType !== 'mysql') {
+    inDelimiterBox.classList.remove('d-none');
+  } else {
+    inDelimiterBox.classList.add('d-none');
+  }
+  
+  if (outType !== 'mysql') {
+    outDelimiterBox.classList.remove('d-none');
+  } else {
+    outDelimiterBox.classList.add('d-none');
+  }
+  
+  // 筛选数据源选项
+  filterOptions('inFSSelect', inType);
+  filterOptions('outFSSelect', outType);
+  
+  // 验证至少一端为 MySQL
+  const isValid = inType === 'mysql' || outType === 'mysql';
+  document.getElementById('previewBtn').disabled = !isValid;
+  updatePreviewStatus(isValid ? '' : '至少一端必须为 MySQL', isValid ? 'info' : 'warning');
+  
+  clearPreview();
 }
 
 function filterOptions(selectId, type) {
-    const select = document.getElementById(selectId);
-    select.querySelectorAll('option').forEach(option => {
-        const isHeader = !option.value || option.disabled;
-        const dataType = option.getAttribute('data-type');
-        option.style.display = isHeader || dataType === type ? 'block' : 'none';
-    });
-    select.value = '';
+  const select = document.getElementById(selectId);
+  select.querySelectorAll('option').forEach(option => {
+    const isHeader = !option.value || option.disabled;
+    const dataType = option.getAttribute('data-type');
+    option.style.display = isHeader || dataType === type ? 'block' : 'none';
+  });
+  select.value = '';
 }
 
+// 加载字段
+// 获取当前数据源类型
+function getDataSourceTypes() {
+  return {
+    inType: document.getElementById('inType').value,
+    outType: document.getElementById('outType').value
+  };
+}
+
+// 获取数据源选择元素
+function getDataSourceSelects(inType, outType) {
+  return {
+    sourceSelect: inType === 'mysql' ? 
+      document.getElementById('srcMySQL') : 
+      document.getElementById('inFSSelect'),
+    targetSelect: outType === 'mysql' ? 
+      document.getElementById('tgtMySQL') : 
+      document.getElementById('outFSSelect')
+  };
+}
 
 function loadColumns() {
-    const colsBox = document.getElementById('colsBox');
-    colsBox.innerHTML = '<div class="empty-state">加载中...</div>';
-    
-    const inType = document.getElementById('inType').value;
-    const useIn = inType === 'mysql';
-    const id = useIn ? document.getElementById('srcMySQL').value : document.getElementById('tgtMySQL').value;
-    const table = useIn ? document.getElementById('inTable').value : document.getElementById('outTable').value;
-    
-    if (!id || !table) {
-        colsBox.innerHTML = '<div class="empty-state">请先选择 MySQL 数据源和表名</div>';
+  const colsBox = document.getElementById('colsBox');
+  colsBox.innerHTML = '<div class="col-12 text-center text-muted py-4"><div class="spinner-border me-2" role="status"></div>加载中...</div>';
+  
+  const { inType } = getDataSourceTypes();
+  const useIn = inType === 'mysql';
+  const id = useIn ? document.getElementById('srcMySQL').value : document.getElementById('tgtMySQL').value;
+  const table = useIn ? document.getElementById('inTable').value : document.getElementById('outTable').value;
+  
+  if (!id || !table) {
+    colsBox.innerHTML = '<div class="col-12 text-center text-muted py-4"><i class="bi bi-exclamation-triangle me-2"></i>请先选择 MySQL 数据源和表名</div>';
+    return;
+  }
+
+  fetch(`/api/meta/mysql/${id}/columns/${encodeURIComponent(table)}`)
+    .then(r => r.json())
+    .then(data => {
+      const cols = data?.columns || [];
+      if (!cols.length) {
+        colsBox.innerHTML = '<div class="col-12 text-center text-muted py-4"><i class="bi bi-inbox me-2"></i>未查询到字段</div>';
         return;
-    }
-
-
-    fetch(`/api/meta/mysql/${id}/columns/${encodeURIComponent(table)}`)
-        .then(r => r.json())
-        .then(data => {
-            const cols = data?.columns || [];
-            if (!cols.length) {
-                colsBox.innerHTML = '<div class="empty-state">未查询到字段</div>';
-                return;
-            }
-            
-            colsBox.innerHTML = '';
-            cols.forEach(col => {
-                const label = document.createElement('label');
-                label.innerHTML = `<input type="checkbox" checked data-name="${col.name}" data-type="${col.data_type || ''}"><span>${col.name} (${col.data_type || ''})</span>`;
-                colsBox.appendChild(label);
-            });
-            
-            document.getElementById('btnSelectAll').style.display = 'inline-block';
-            document.getElementById('btnSelectNone').style.display = 'inline-block';
-            clearPreview();
-        })
-        .catch(() => {
-            colsBox.innerHTML = '<div class="empty-state">加载失败</div>';
-        });
+      }
+      
+      colsBox.innerHTML = '';
+      cols.forEach(col => {
+        const colDiv = document.createElement('div');
+        colDiv.className = 'col-md-3 col-sm-4 col-6';
+        colDiv.innerHTML = `
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="col-${col.name}" checked data-name="${col.name}" data-type="${col.data_type || ''}">
+            <label class="form-check-label" for="col-${col.name}">
+              ${col.name} <small class="text-muted">(${col.data_type || ''})</small>
+            </label>
+          </div>
+        `;
+        colsBox.appendChild(colDiv);
+      });
+      
+      document.getElementById('selectAllBtn').style.display = 'inline-block';
+      document.getElementById('selectNoneBtn').style.display = 'inline-block';
+      clearPreview();
+    })
+    .catch(() => {
+      colsBox.innerHTML = '<div class="col-12 text-center text-muted py-4"><i class="bi bi-exclamation-triangle me-2"></i>加载失败</div>';
+    });
 }
 
-function toggleAll(selectAll) {
-    const checkboxes = document.querySelectorAll('#colsBox input[type="checkbox"]');
-    checkboxes.forEach(cb => cb.checked = selectAll);
+function toggleAllColumns(selectAll) {
+  const checkboxes = document.querySelectorAll('#colsBox input[type="checkbox"]');
+  checkboxes.forEach(cb => cb.checked = selectAll);
 }
 
 function clearPreview() {
-    const jsonArea = document.getElementById('jsonArea');
-    const pvStatus = document.getElementById('pvStatus');
-    const btnSave = document.getElementById('btnSave');
-    
-    jsonArea.style.display = 'none';
-    jsonArea.value = '';
-    pvStatus.textContent = '';
-    pvStatus.className = 'help';
-    btnSave.disabled = true;
+  const jsonArea = document.getElementById('jsonArea');
+  const previewContainer = document.getElementById('previewContainer');
+  const previewStatus = document.getElementById('previewStatus');
+  const saveBtn = document.getElementById('saveBtn');
+  
+  previewContainer.classList.add('d-none');
+  jsonArea.value = '';
+  previewStatus.innerHTML = '';
+  saveBtn.disabled = true;
+}
+
+function updatePreviewStatus(message, type) {
+  const previewStatus = document.getElementById('previewStatus');
+  if (!message) {
+    previewStatus.innerHTML = '';
+    return;
+  }
+  
+  const alertClass = type === 'success' ? 'alert-success' : 
+                   type === 'warning' ? 'alert-warning' : 
+                   type === 'error' ? 'alert-danger' : 'alert-info';
+  
+  previewStatus.innerHTML = `
+    <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+      <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : type === 'error' ? 'x-circle' : 'info-circle'} me-2"></i>
+      ${message}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  `;
 }
 
 function generatePreview() {
-    clearPreview();
-    
-    const cols = Array.from(document.querySelectorAll('#colsBox input[type="checkbox"]:checked')).map(cb => cb.dataset.name);
-    if (!cols.length) {
-        document.getElementById('pvStatus').textContent = '请先加载并选择字段';
-        document.getElementById('pvStatus').className = 'help warn';
-        return;
-    }
+  clearPreview();
+  
+  const cols = Array.from(document.querySelectorAll('#colsBox input[type="checkbox"]:checked')).map(cb => ({
+    name: cb.dataset.name,
+    data_type: cb.dataset.type || ''
+  }));
+  
+  if (!cols.length) {
+    updatePreviewStatus('请先加载并选择字段', 'warning');
+    return;
+  }
 
+  const { inType, outType } = getDataSourceTypes();
 
-    const inType = document.getElementById('inType').value;
-    const outType = document.getElementById('outType').value;
-
-    // 验证文件系统分隔符必填
-    if (inType !== 'mysql') {
-        const inDelimiter = document.getElementById('inDelimiter').value.trim();
-        if (!inDelimiter) {
-            document.getElementById('pvStatus').textContent = '文件系统输入时，文本分隔符为必填项';
-            document.getElementById('pvStatus').className = 'help warn';
-            return;
-        }
-    }
-
-    if (outType !== 'mysql') {
-        const outDelimiter = document.getElementById('outDelimiter').value.trim();
-        if (!outDelimiter) {
-            document.getElementById('pvStatus').textContent = '文件系统输出时，文本分隔符为必填项';
-            document.getElementById('pvStatus').className = 'help warn';
-            return;
-        }
-    }
-
-    // 构建columns数据，包含data_type
-    const columns = [];
-    const checkedBoxes = document.querySelectorAll('#colsBox input[type="checkbox"]:checked');
-    checkedBoxes.forEach(cb => {
-        const name = cb.dataset.name;
-        const dataType = cb.dataset.type || '';
-        columns.push({name, data_type: dataType});
-    });
-
-    const payload = {
-        inType, outType,
-        mysqlBase: inType === 'mysql' ? 'in' : 'out',
-        in: {}, out: {},
-        mysqlWhere: inType === 'mysql' ? (document.getElementById('inWhere').value || '') : '',
-        columns: columns
-    };
-
-    // 构建输入配置
-    if (inType === 'mysql') {
-        payload.in.mysql = {
-            source_id: Number(document.getElementById('srcMySQL').value || 0),
-            table: document.getElementById('inTable').value.trim()
-        };
-    } else {
-        payload.in.fs = {
-            fs_id: Number(document.getElementById('inFSSelect').value || 0),
-            fileType: document.getElementById('inFileType').value,
-            path: document.getElementById('inPath').value.trim(),
-            filename: document.getElementById('inFilename').value.trim() || undefined,
-            indexes: (document.getElementById('inIndexes').value || '')
-                .split(',').map(s => parseInt(s.trim(), 10)).filter(Number.isInteger),
-            fieldDelimiter: document.getElementById('inDelimiter').value.trim()
-        };
-    }
-
-    // 构建输出配置
-    if (outType === 'mysql') {
-        payload.out.mysql = {
-            target_id: Number(document.getElementById('tgtMySQL').value || 0),
-            table: document.getElementById('outTable').value.trim()
-        };
-    } else {
-        payload.out.fs = {
-            fs_id: Number(document.getElementById('outFSSelect').value || 0),
-            fileType: document.getElementById('outFileType').value,
-            path: document.getElementById('outPath').value.trim(),
-            filename: document.getElementById('outFilename').value.trim() || undefined,
-            writeMode: document.getElementById('outWriteMode').value || 'nonConflict',
-            fieldDelimiter: document.getElementById('outDelimiter').value.trim()
-        };
-    }
-
-    document.getElementById('pvStatus').textContent = '正在生成预览...';
-    
-    fetch('/api/datax/preview', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(resp => {
-        const pvStatus = document.getElementById('pvStatus');
-        const jsonArea = document.getElementById('jsonArea');
-        
-        if (!resp || resp.ok === false) {
-            pvStatus.textContent = resp?.error || '生成失败';
-            pvStatus.className = 'help warn';
-            return;
-        }
-        
-        jsonArea.value = JSON.stringify(resp.json, null, 2);
-        jsonArea.style.display = 'block';
-        pvStatus.textContent = '预览生成成功';
-        pvStatus.className = 'help success';
-        document.getElementById('btnSave').disabled = false;
-    })
-    .catch(() => {
-        document.getElementById('pvStatus').textContent = '请求异常';
-        document.getElementById('pvStatus').className = 'help warn';
-    });
-}
-
-function saveTask() {
-    const jsonArea = document.getElementById('jsonArea');
-    if (jsonArea.style.display !== 'block') {
-        alert('请先生成预览');
-        return;
-    }
-    
-    try {
-        JSON.parse(jsonArea.value);
-    } catch (err) {
-        alert('JSON 格式错误：' + err.message);
-        return;
-    }
-
-    const form = document.getElementById('taskForm');
-    
-    // 使用统一的校验函数
-    const errors = validateFormByType(form, 'task');
-    if (errors.length > 0) {
-      showFormErrors(errors, form);
+  // 验证文件系统分隔符必填
+  if (inType !== 'mysql') {
+    const inDelimiter = document.getElementById('inDelimiter').value.trim();
+    if (!inDelimiter) {
+      updatePreviewStatus('文件系统输入时，文本分隔符为必填项', 'warning');
       return;
     }
+  }
 
-    const addHidden = (name, val) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = name;
-        input.value = val;
-        form.appendChild(input);
-    };
-
-    addHidden('datax_json', jsonArea.value);
-    
-    const inType = document.getElementById('inType').value;
-    const outType = document.getElementById('outType').value;
-    addHidden('source_id', inType === 'mysql' ? (document.getElementById('srcMySQL').value || '0') : '0');
-    
-    // 设置target_id - 根据输出类型选择对应的数据源ID
-    let targetId = '0';
-    if (outType === 'mysql') {
-        targetId = document.getElementById('tgtMySQL').value || '0';
-    } else {
-        // 文件系统类型：OFS、HDFS、COSN
-        targetId = document.getElementById('outFSSelect').value || '0';
+  if (outType !== 'mysql') {
+    const outDelimiter = document.getElementById('outDelimiter').value.trim();
+    if (!outDelimiter) {
+      updatePreviewStatus('文件系统输出时，文本分隔符为必填项', 'warning');
+      return;
     }
-    addHidden('target_id', targetId);
-    addHidden('flow_id', document.getElementById('flowSelect').value);
+  }
 
-    form.submit();
+  const payload = {
+    inType, outType,
+    in: {}, out: {},
+    mysqlWhere: inType === 'mysql' ? (document.getElementById('inWhere').value || '') : '',
+    columns: cols
+  };
+
+  // 获取数据源选择元素
+  const { sourceSelect, targetSelect } = getDataSourceSelects(inType, outType);
+
+  // 构建输入配置
+  if (inType === 'mysql') {
+    payload.in.mysql = {
+      source_id: Number(sourceSelect.value || 0),
+      table: document.getElementById('inTable').value.trim()
+    };
+  } else {
+    payload.in.fs = {
+      fs_id: Number(sourceSelect.value || 0),
+      fileType: document.getElementById('inFileType').value,
+      path: document.getElementById('inPath').value.trim(),
+      filename: document.getElementById('inFilename').value.trim() || undefined,
+      indexes: (document.getElementById('inIndexes').value || '')
+        .split(',').map(s => parseInt(s.trim(), 10)).filter(Number.isInteger),
+      fieldDelimiter: document.getElementById('inDelimiter').value.trim()
+    };
+  }
+
+  // 构建输出配置
+  if (outType === 'mysql') {
+    payload.out.mysql = {
+      target_id: Number(targetSelect.value || 0),
+      table: document.getElementById('outTable').value.trim()
+    };
+  } else {
+    payload.out.fs = {
+      fs_id: Number(targetSelect.value || 0),
+      fileType: document.getElementById('outFileType').value,
+      path: document.getElementById('outPath').value.trim(),
+      filename: document.getElementById('outFilename').value.trim() || undefined,
+      writeMode: document.getElementById('outWriteMode').value || 'nonConflict',
+      fieldDelimiter: document.getElementById('outDelimiter').value.trim()
+    };
+  }
+
+  updatePreviewStatus('正在生成预览...', 'info');
+  
+  fetch('/api/datax/preview', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(resp => {
+    if (!resp || resp.ok === false) {
+      updatePreviewStatus(resp?.error || '生成失败', 'error');
+      return;
+    }
+    
+    const jsonArea = document.getElementById('jsonArea');
+    const previewContainer = document.getElementById('previewContainer');
+    
+    jsonArea.value = JSON.stringify(resp.json, null, 2);
+    previewContainer.classList.remove('d-none');
+    updatePreviewStatus('预览生成成功', 'success');
+    document.getElementById('saveBtn').disabled = false;
+    document.getElementById('formatBtn').classList.remove('d-none');
+    document.getElementById('validateBtn').classList.remove('d-none');
+  })
+  .catch(() => {
+    updatePreviewStatus('请求异常', 'error');
+  });
 }
 
 function formatJSON() {
-    const jsonArea = document.getElementById('jsonArea');
-    if (jsonArea.style.display !== 'block') {
-        alert('请先生成预览');
-        return;
-    }
-    
-    try {
-        const obj = JSON.parse(jsonArea.value);
-        jsonArea.value = JSON.stringify(obj, null, 2);
-        const pvStatus = document.getElementById('pvStatus');
-        pvStatus.textContent = '格式化完成';
-        pvStatus.className = 'help success';
-    } catch (err) {
-        const pvStatus = document.getElementById('pvStatus');
-        pvStatus.textContent = 'JSON 无法解析：' + err.message;
-        pvStatus.className = 'help warn';
-    }
+  const jsonArea = document.getElementById('jsonArea');
+  if (!jsonArea.value) {
+    updatePreviewStatus('请先生成预览', 'warning');
+    return;
+  }
+  
+  try {
+    const obj = JSON.parse(jsonArea.value);
+    jsonArea.value = JSON.stringify(obj, null, 2);
+    updatePreviewStatus('格式化完成', 'success');
+  } catch (err) {
+    updatePreviewStatus('JSON 无法解析：' + err.message, 'error');
+  }
 }
 
 function validateJSON() {
-    const jsonArea = document.getElementById('jsonArea');
-    if (jsonArea.style.display !== 'block') {
-        alert('请先生成预览');
-        return;
+  const jsonArea = document.getElementById('jsonArea');
+  if (!jsonArea.value) {
+    updatePreviewStatus('请先生成预览', 'warning');
+    return;
+  }
+  
+  try {
+    const obj = JSON.parse(jsonArea.value);
+    const isValid = obj?.job?.content?.length > 0;
+    if (!isValid) throw new Error('缺少 job.content');
+    
+    const content = obj.job.content[0] || {};
+    if (!content.reader?.name || !content.writer?.name) {
+      throw new Error('缺少 reader/writer 或 name 字段');
     }
     
-    try {
-        const obj = JSON.parse(jsonArea.value);
-        const isValid = obj?.job?.content?.length > 0;
-        if (!isValid) throw new Error('缺少 job.content');
-        
-        const content = obj.job.content[0] || {};
-        if (!content.reader?.name || !content.writer?.name) {
-            throw new Error('缺少 reader/writer 或 name 字段');
-        }
-        
-        const pvStatus = document.getElementById('pvStatus');
-        pvStatus.textContent = '结构校验通过';
-        pvStatus.className = 'help success';
-    } catch (err) {
-        const pvStatus = document.getElementById('pvStatus');
-        pvStatus.textContent = '校验失败：' + err.message;
-        pvStatus.className = 'help warn';
-    }
+    updatePreviewStatus('结构校验通过', 'success');
+  } catch (err) {
+    updatePreviewStatus('校验失败：' + err.message, 'error');
+  }
+}
+
+function generateIndexes() {
+  const checkedBoxes = document.querySelectorAll('#colsBox input[type="checkbox"]:checked');
+  if (checkedBoxes.length <= 0) {
+    updatePreviewStatus('请先加载并勾选列', 'warning');
+    return;
+  }
+  
+  const indexes = Array.from({length: checkedBoxes.length}, (_, i) => i);
+  const inIndexes = document.getElementById('inIndexes');
+  if (inIndexes) {
+    inIndexes.value = indexes.join(',');
+  }
 }
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
-    toggleDataSource();
+  toggleDataSource();
+  
+  // 添加表单提交处理
+  const form = document.getElementById('taskForm');
+  form.addEventListener('submit', function(e) {
+    const jsonArea = document.getElementById('jsonArea');
+    const { inType, outType } = getDataSourceTypes();
+    
+    // 验证JSON配置
+    if (!jsonArea.value.trim()) {
+      e.preventDefault();
+      updatePreviewStatus('请先生成DataX配置预览', 'warning');
+      return;
+    }
+    
+    // 验证JSON格式
+    try {
+      JSON.parse(jsonArea.value);
+    } catch (err) {
+      e.preventDefault();
+      updatePreviewStatus('JSON格式不正确，请检查配置', 'error');
+      return;
+    }
+    
+    // 验证数据源ID
+    const { sourceSelect, targetSelect } = getDataSourceSelects(inType, outType);
+    
+    if (!sourceSelect.value.trim()) {
+      e.preventDefault();
+      updatePreviewStatus('请选择输入数据源', 'warning');
+      return;
+    }
+    
+    if (!targetSelect.value.trim()) {
+      e.preventDefault();
+      updatePreviewStatus('请选择输出数据源', 'warning');
+      return;
+    }
+    
+    // 动态设置name属性，确保表单提交时使用正确的字段名
+    sourceSelect.name = 'source_id';
+    targetSelect.name = 'target_id';
+  });
 });
 </script>
+
 {{template "footer" .}}
 {{end}}

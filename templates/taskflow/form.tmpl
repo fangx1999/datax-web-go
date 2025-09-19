@@ -1,456 +1,419 @@
 {{define "taskflow/form.tmpl"}}
 {{template "header" .}}
+{{template "common/alert.tmpl" .}}
 
-<div class="page">
-  <div class="toolbar">
-    <h1 class="h1">{{if .IsEdit}}{{.Name}} - 属性编辑{{else}}新建任务流{{end}}</h1>
-    <div class="controls">
-      <a class="btn" href="/task-flows">← 返回列表</a>
-    </div>
+<div>
+  <!-- 页面标题 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+      <i class="bi bi-diagram-3 me-2"></i>{{if .IsEdit}}{{.Name}} - 属性编辑{{else}}新建任务流{{end}}
+    </h1>
+    <a href="/task-flows" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>返回列表
+    </a>
   </div>
 
-  <div class="form-wrap">
-    <form method="post" action="{{if .IsEdit}}/task-flows/{{.FlowID}}{{else}}/task-flows{{end}}" class="form">
-      <div class="form-group">
-        <label for="name">任务流名称 *</label>
-        <input type="text" id="name" name="name" value="{{if .IsEdit}}{{.Name}}{{end}}" {{if .IsEdit}}readonly{{else}}required{{end}} placeholder="请输入任务流名称">
-        {{if .IsEdit}}<small class="form-hint">任务流名称不可修改</small>{{end}}
+  <form method="post" action="/task-flows{{if .IsEdit}}/{{.FlowID}}{{end}}" id="taskflowForm">
+    {{if .IsEdit}}
+    <input type="hidden" name="_method" value="PUT">
+    {{end}}
+    
+    <!-- 基本信息 -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-info-circle me-2"></i>基本信息
+        </h5>
       </div>
-
-      <div class="form-group">
-        <label for="description">描述</label>
-        <textarea id="description" name="description" rows="3" placeholder="请输入任务流描述">{{if .IsEdit}}{{.Description}}{{end}}</textarea>
-      </div>
-
-      <div class="form-group">
-        <label>执行计划 *</label>
-        <div class="cron-builder">
-          <div class="cron-section">
-            <label>执行频率</label>
-            <select id="frequency" onchange="updateCronExpression()">
-              <option value="daily">每天执行</option>
-              <option value="weekly">每周执行</option>
-              <option value="monthly">每月执行</option>
-              <option value="custom">自定义表达式</option>
-            </select>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <label for="name" class="form-label">任务流名称 <span class="text-danger">*</span></label>
+            <input type="text" 
+                   class="form-control" 
+                   id="name" 
+                   name="name" 
+                   value="{{if .IsEdit}}{{.Name}}{{end}}"
+                   placeholder="daily_data_sync"
+                   required>
+            <div class="form-text">建议使用有意义的名称，例如：daily_data_sync</div>
           </div>
-          
-          <div id="daily-options" class="cron-options">
-            <div class="time-section">
-              <label>执行时间</label>
-              <div class="time-inputs">
-                <input type="number" id="daily-hour" min="0" max="23" value="2" placeholder="时" onchange="updateCronExpression()">
-                <span>:</span>
-                <input type="number" id="daily-minute" min="0" max="59" value="0" placeholder="分" onchange="updateCronExpression()">
-                <span>:</span>
-                <input type="number" id="daily-second" min="0" max="59" value="0" placeholder="秒" onchange="updateCronExpression()">
-              </div>
-            </div>
+          <div class="col-md-6">
+            <label for="cron_expr" class="form-label">CRON 表达式 <span class="text-danger">*</span></label>
+            <input type="text" 
+                   class="form-control" 
+                   id="cron_expr" 
+                   name="cron_expr" 
+                   value="{{if .IsEdit}}{{.CronExpr}}{{end}}"
+                   placeholder="0 0 2 * * *"
+                   required>
+            <div class="form-text">6位格式：秒 分钟 小时 日期 月份 星期，例如：0 0 2 * * * (每天凌晨2点)</div>
           </div>
-          
-          <div id="weekly-options" class="cron-options" style="display: none;">
-            <div class="cron-row">
-              <div class="cron-section">
-                <label>星期几</label>
-                <select id="weekly-day" onchange="updateCronExpression()">
-                  <option value="1">星期一</option>
-                  <option value="2">星期二</option>
-                  <option value="3">星期三</option>
-                  <option value="4">星期四</option>
-                  <option value="5">星期五</option>
-                  <option value="6">星期六</option>
-                  <option value="0">星期日</option>
-                </select>
-              </div>
-              <div class="time-section">
-                <label>执行时间</label>
-                <div class="time-inputs">
-                  <input type="number" id="weekly-hour" min="0" max="23" value="2" placeholder="时" onchange="updateCronExpression()">
-                  <span>:</span>
-                  <input type="number" id="weekly-minute" min="0" max="59" value="0" placeholder="分" onchange="updateCronExpression()">
-                  <span>:</span>
-                  <input type="number" id="weekly-second" min="0" max="59" value="0" placeholder="秒" onchange="updateCronExpression()">
+        </div>
+        
+        <div class="row mt-3">
+          <div class="col-md-6">
+            <label for="description" class="form-label">描述</label>
+            <textarea class="form-control" 
+                      id="description" 
+                      name="description" 
+                      rows="8"
+                      placeholder="任务流描述...">{{if .IsEdit}}{{.Description}}{{end}}</textarea>
+          </div>
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-body">
+                <h6 class="card-title">CRON 表达式构建器</h6>
+                
+                <div class="row g-2">
+                  <div class="col-md-2">
+                    <label class="form-label small">秒</label>
+                    <input type="text" class="form-control form-control-sm" id="second" value="0" placeholder="0">
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small">分钟</label>
+                    <input type="text" class="form-control form-control-sm" id="minute" value="0" placeholder="0">
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small">小时</label>
+                    <input type="text" class="form-control form-control-sm" id="hour" value="2" placeholder="2">
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small">日期</label>
+                    <input type="text" class="form-control form-control-sm" id="day" value="*" placeholder="*">
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small">月份</label>
+                    <input type="text" class="form-control form-control-sm" id="month" value="*" placeholder="*">
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small">星期</label>
+                    <input type="text" class="form-control form-control-sm" id="weekday" value="*" placeholder="*">
+                  </div>
+                </div>
+                
+                <div class="mt-2">
+                  <small class="text-muted">
+                    支持: * ? 数字 1-5 1,3,5 */10 等CRON语法
+                  </small>
+                </div>
+                
+                <div class="mt-3">
+                  <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="generateCron()">
+                      <i class="bi bi-arrow-clockwise me-1"></i>生成表达式
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="{{if .IsEdit}}resetToOriginalCron(){{else}}clearCronBuilder(){{end}}">
+                      <i class="bi bi-x-circle me-1"></i>{{if .IsEdit}}重置{{else}}清空{{end}}
+                    </button>
+                  </div>
+                  <div class="mt-2">
+                    <small class="text-muted">
+                      生成的表达式：<code id="generatedCron">{{if .IsEdit}}{{.CronExpr}}{{else}}0 0 2 * * *{{end}}</code>
+                    </small>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          
-          <div id="monthly-options" class="cron-options" style="display: none;">
-            <div class="cron-row">
-              <div class="cron-section">
-                <label>每月第几天</label>
-                <input type="number" id="monthly-day" min="1" max="31" value="1" onchange="updateCronExpression()">
-              </div>
-              <div class="time-section">
-                <label>执行时间</label>
-                <div class="time-inputs">
-                  <input type="number" id="monthly-hour" min="0" max="23" value="2" placeholder="时" onchange="updateCronExpression()">
-                  <span>:</span>
-                  <input type="number" id="monthly-minute" min="0" max="59" value="0" placeholder="分" onchange="updateCronExpression()">
-                  <span>:</span>
-                  <input type="number" id="monthly-second" min="0" max="59" value="0" placeholder="秒" onchange="updateCronExpression()">
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div id="custom-options" class="cron-options" style="display: none;">
-            <div class="cron-section">
-              <label>CRON表达式</label>
-              <input type="text" id="custom-cron" placeholder="例如: 0 0 1 * * ?" onchange="updateCronExpression()">
-              <div class="cron-hint">格式: 秒 分 时 日 月 周 (6个字段)</div>
-            </div>
-          </div>
-          
-          <div class="cron-preview">
-            <label>生成的表达式:</label>
-            <input type="text" id="cron" name="cron" value="{{if .IsEdit}}{{.Cron}}{{end}}" readonly class="cron-preview-input">
-            <div class="cron-description" id="cron-description"></div>
           </div>
         </div>
       </div>
+    </div>
 
-
-      <div class="form-actions">
-        <button type="submit" class="btn primary">{{if .IsEdit}}保存修改{{else}}创建任务流{{end}}</button>
-        <a class="btn" href="/task-flows">取消</a>
-      </div>
-    </form>
-  </div>
+    <!-- 操作按钮 -->
+    <div class="d-flex justify-content-end gap-2">
+      <button type="button" 
+              class="btn btn-secondary" 
+              onclick="history.back()">
+        <i class="bi bi-x-circle me-1"></i>取消
+      </button>
+      <button type="submit" 
+              class="btn btn-primary">
+        <i class="bi bi-check me-1"></i>{{if .IsEdit}}更新{{else}}创建{{end}}
+      </button>
+    </div>
+  </form>
 </div>
 
 <script>
-function updateCronExpression() {
-  const frequency = document.getElementById('frequency').value;
-  const cronInput = document.getElementById('cron');
-  const descriptionDiv = document.getElementById('cron-description');
+// 表单验证
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('taskflowForm');
   
-  let cronExpression = '';
-  let description = '';
+  // 初始化CRON构建器
+  initializeCronBuilder();
   
-  // 获取时间值的通用函数
-  const getTimeValues = (prefix) => ({
-    hour: document.getElementById(`${prefix}-hour`).value || '0',
-    minute: document.getElementById(`${prefix}-minute`).value || '0',
-    second: document.getElementById(`${prefix}-second`).value || '0'
+  
+  form.addEventListener('submit', function(e) {
+    const name = document.getElementById('name').value.trim();
+    const cronExpr = document.getElementById('cron_expr').value.trim();
+    
+    if (!name) {
+      e.preventDefault();
+      showAlert('请输入任务流名称', 'warning');
+      return;
+    }
+    
+    if (!cronExpr) {
+      e.preventDefault();
+      showAlert('请输入 CRON 表达式', 'warning');
+      return;
+    }
+    
+    // 完整的 CRON 表达式验证
+    const validation = validateCronExpression(cronExpr);
+    if (!validation.valid) {
+      e.preventDefault();
+      showAlert(validation.message, 'warning');
+      return;
+    }
   });
-  
-  // 格式化时间显示
-  const formatTime = (hour, minute, second) => 
-    `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:${second.padStart(2, '0')}`;
-  
-  switch(frequency) {
-    case 'daily': {
-      const time = getTimeValues('daily');
-      cronExpression = `${time.second} ${time.minute} ${time.hour} * * ?`;
-      description = `每天 ${formatTime(time.hour, time.minute, time.second)} 执行`;
-      break;
-    }
-      
-    case 'weekly': {
-      const time = getTimeValues('weekly');
-      const day = document.getElementById('weekly-day').value;
-      const dayNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-      cronExpression = `${time.second} ${time.minute} ${time.hour} ? * ${day}`;
-      description = `每${dayNames[day]} ${formatTime(time.hour, time.minute, time.second)} 执行`;
-      break;
-    }
-      
-    case 'monthly': {
-      const time = getTimeValues('monthly');
-      const day = document.getElementById('monthly-day').value;
-      cronExpression = `${time.second} ${time.minute} ${time.hour} ${day} * ?`;
-      description = `每月${day}日 ${formatTime(time.hour, time.minute, time.second)} 执行`;
-      break;
-    }
-      
-    case 'custom':
-      cronExpression = document.getElementById('custom-cron').value;
-      description = '自定义CRON表达式';
-      break;
+});
+
+// ==================== CRON 表达式验证 ====================
+function validateCronExpression(cronExpr) {
+  // 基本格式检查：6个字段，用空格分隔（支持秒的cron格式）
+  const parts = cronExpr.trim().split(/\s+/);
+  if (parts.length !== 6) {
+    return {
+      valid: false,
+      message: 'CRON 表达式必须包含6个字段：秒 分钟 小时 日期 月份 星期'
+    };
   }
   
-  cronInput.value = cronExpression;
-  descriptionDiv.textContent = description;
+  const [second, minute, hour, day, month, weekday] = parts;
   
-  // 验证cron表达式
-  validateCronExpression(cronExpression);
+  // 验证秒 (0-59)
+  if (!validateCronField(second, 0, 59, '秒')) {
+    return {
+      valid: false,
+      message: '秒字段无效，应为 0-59 或 *'
+    };
+  }
+  
+  // 验证分钟 (0-59)
+  if (!validateCronField(minute, 0, 59, '分钟')) {
+    return {
+      valid: false,
+      message: '分钟字段无效，应为 0-59 或 *'
+    };
+  }
+  
+  // 验证小时 (0-23)
+  if (!validateCronField(hour, 0, 23, '小时')) {
+    return {
+      valid: false,
+      message: '小时字段无效，应为 0-23 或 *'
+    };
+  }
+  
+  // 验证日期 (1-31)
+  if (!validateCronField(day, 1, 31, '日期')) {
+    return {
+      valid: false,
+      message: '日期字段无效，应为 1-31 或 *'
+    };
+  }
+  
+  // 验证月份 (1-12)
+  if (!validateCronField(month, 1, 12, '月份')) {
+    return {
+      valid: false,
+      message: '月份字段无效，应为 1-12 或 *'
+    };
+  }
+  
+  // 验证星期 (0-7, 0和7都表示周日)
+  if (!validateCronField(weekday, 0, 7, '星期')) {
+    return {
+      valid: false,
+      message: '星期字段无效，应为 0-7 或 * (0和7都表示周日)'
+    };
+  }
+  
+  // 检查日期和星期的冲突
+  if (day !== '*' && day !== '?' && weekday !== '*' && weekday !== '?') {
+    return {
+      valid: false,
+      message: '日期和星期不能同时指定具体值，其中一个必须为 * 或 ?'
+    };
+  }
+  
+  return { valid: true, message: '' };
 }
 
-function validateCronExpression(expr) {
-  const descriptionDiv = document.getElementById('cron-description');
+function validateCronField(field, min, max, fieldName) {
+  // 允许的值：* ? 数字 数字-数字 数字,数字 数字/数字
+  const cronPattern = /^(\*|\?|\d+(-\d+)?(,\d+(-\d+)?)*(\/\d+)?)$/;
   
-  if (!expr || expr.trim() === '') {
-    descriptionDiv.textContent = '请输入cron表达式';
-    descriptionDiv.style.color = '#ff6b6b';
+  if (!cronPattern.test(field)) {
     return false;
   }
   
-  // 检查cron表达式格式（6个字段：秒 分 时 日 月 周）
-  const parts = expr.trim().split(/\s+/);
-  if (parts.length !== 6) {
-    descriptionDiv.textContent = '错误: cron表达式必须是6个字段 (秒 分 时 日 月 周)';
-    descriptionDiv.style.color = '#ff6b6b';
-    return false;
+  // 如果是 * 或 ?，直接通过
+  if (field === '*' || field === '?') {
+    return true;
   }
   
-  // 基本格式检查
-  const validPattern = /^(\*|([0-5]?\d)(-([0-5]?\d))?(,([0-5]?\d)(-([0-5]?\d))?)*)(\/([0-5]?\d))?$/;
-  for (let i = 0; i < parts.length; i++) {
-    if (parts[i] !== '*' && parts[i] !== '?' && !validPattern.test(parts[i])) {
-      descriptionDiv.textContent = '错误: cron表达式格式不正确';
-      descriptionDiv.style.color = '#ff6b6b';
+  // 解析复杂表达式
+  const parts = field.split(',');
+  for (const part of parts) {
+    if (!validateCronFieldPart(part, min, max)) {
       return false;
     }
   }
   
-  descriptionDiv.style.color = '#51cf66';
   return true;
 }
 
-function showCronOptions() {
-  const frequency = document.getElementById('frequency').value;
-  
-  // 隐藏所有选项
-  document.querySelectorAll('.cron-options').forEach(option => {
-    option.style.display = 'none';
-  });
-  
-  // 显示对应的选项
-  document.getElementById(frequency + '-options').style.display = 'block';
-  
-  updateCronExpression();
-}
-
-// 解析现有CRON表达式
-function parseExistingCron(cronExpr) {
-  if (!cronExpr) return;
-  
-  const parts = cronExpr.split(' ');
-  if (parts.length !== 7) return;
-  
-  const [second, minute, hour, day, month, weekday, year] = parts;
-  
-  // 判断类型
-  if (day === '*' && weekday === '?') {
-    // 每天执行
-    document.getElementById('frequency').value = 'daily';
-    document.getElementById('daily-hour').value = hour;
-    document.getElementById('daily-minute').value = minute;
-    document.getElementById('daily-second').value = second;
-  } else if (day === '?' && weekday !== '*') {
-    // 每周执行
-    document.getElementById('frequency').value = 'weekly';
-    document.getElementById('weekly-day').value = weekday;
-    document.getElementById('weekly-hour').value = hour;
-    document.getElementById('weekly-minute').value = minute;
-    document.getElementById('weekly-second').value = second;
-  } else if (day !== '*' && day !== '?' && weekday === '?') {
-    // 每月执行
-    document.getElementById('frequency').value = 'monthly';
-    document.getElementById('monthly-day').value = day;
-    document.getElementById('monthly-hour').value = hour;
-    document.getElementById('monthly-minute').value = minute;
-    document.getElementById('monthly-second').value = second;
-  } else {
-    // 自定义
-    document.getElementById('frequency').value = 'custom';
-    document.getElementById('custom-cron').value = cronExpr;
-  }
-}
-
-// 初始化
-document.addEventListener('DOMContentLoaded', function() {
-  // 绑定频率选择事件
-  document.getElementById('frequency').addEventListener('change', showCronOptions);
-  
-  // 解析现有CRON表达式（编辑模式）
-  const existingCron = document.getElementById('cron').value;
-  if (existingCron) {
-    parseExistingCron(existingCron);
-  }
-  
-  // 表单提交验证
-  document.querySelector('form').addEventListener('submit', function(e) {
-    const cronExpr = document.getElementById('cron').value;
-    if (!validateCronExpression(cronExpr)) {
-      e.preventDefault();
-      alert('请检查cron表达式格式是否正确');
+function validateCronFieldPart(part, min, max) {
+  // 处理步长表达式 (如 */5, 1-10/2)
+  const stepMatch = part.match(/^(.+)\/(\d+)$/);
+  if (stepMatch) {
+    const range = stepMatch[1];
+    const step = parseInt(stepMatch[2]);
+    
+    if (step <= 0) {
       return false;
+    }
+    
+    // 验证范围部分
+    if (range === '*') {
+      return true; // */5 是有效的
+    }
+    
+    return validateCronFieldPart(range, min, max);
+  }
+  
+  // 处理范围表达式 (如 1-10)
+  const rangeMatch = part.match(/^(\d+)-(\d+)$/);
+  if (rangeMatch) {
+    const start = parseInt(rangeMatch[1]);
+    const end = parseInt(rangeMatch[2]);
+    
+    return start >= min && start <= max && 
+           end >= min && end <= max && 
+           start <= end;
+  }
+  
+  // 处理单个数字
+  const num = parseInt(part);
+  return !isNaN(num) && num >= min && num <= max;
+}
+
+
+// ==================== CRON 构建器功能 ====================
+function initializeCronBuilder() {
+  // 为所有输入框添加事件监听
+  const inputs = ['second', 'minute', 'hour', 'day', 'month', 'weekday'];
+  inputs.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.addEventListener('input', updateCronPreview);
     }
   });
   
-  // 初始化显示
-  showCronOptions();
+  // 编辑模式下，从后端数据初始化构建器
+  {{if .IsEdit}}
+  initializeFromExistingCron('{{.CronExpr}}');
+  {{else}}
+  // 新建模式下，使用默认值
+  updateCronPreview();
+  {{end}}
+}
+
+// 从现有 CRON 表达式初始化构建器
+function initializeFromExistingCron(cronExpr) {
+  if (!cronExpr || cronExpr.trim() === '') {
+    updateCronPreview();
+    return;
+  }
   
-  // 使用统一的表单校验
-  document.querySelector('form').addEventListener('submit', createFormSubmitHandler((form) => validateFormByType(form, 'taskFlow'), {
-    showErrors: showFormErrors
-  }));
-});
+  const parts = cronExpr.trim().split(/\s+/);
+  if (parts.length !== 6) {
+    console.warn('Invalid CRON expression format:', cronExpr);
+    updateCronPreview();
+    return;
+  }
+  
+  const [second, minute, hour, day, month, weekday] = parts;
+  
+  // 填充各个字段
+  document.getElementById('second').value = second || '0';
+  document.getElementById('minute').value = minute || '0';
+  document.getElementById('hour').value = hour || '2';
+  document.getElementById('day').value = day || '*';
+  document.getElementById('month').value = month || '*';
+  document.getElementById('weekday').value = weekday || '*';
+  
+  // 更新预览
+  updateCronPreview();
+}
+
+function generateCron() {
+  const second = document.getElementById('second').value.trim() || '0';
+  const minute = document.getElementById('minute').value.trim() || '0';
+  const hour = document.getElementById('hour').value.trim() || '2';
+  const day = document.getElementById('day').value.trim() || '*';
+  const month = document.getElementById('month').value.trim() || '*';
+  const weekday = document.getElementById('weekday').value.trim() || '*';
+  
+  const cronExpr = `${second} ${minute} ${hour} ${day} ${month} ${weekday}`;
+  
+  // 更新输入框
+  const cronInput = document.getElementById('cron_expr');
+  cronInput.value = cronExpr;
+
+  
+  // 更新预览
+  document.getElementById('generatedCron').textContent = cronExpr;
+  
+  // 简单验证
+  const validation = validateCronExpression(cronExpr);
+  if (validation.valid) {
+    showAlert('CRON 表达式已生成', 'success');
+  } else {
+    showAlert('生成的表达式有误: ' + validation.message, 'warning');
+  }
+}
+
+function clearCronBuilder() {
+  // 重置所有输入框
+  document.getElementById('second').value = '0';
+  document.getElementById('minute').value = '0';
+  document.getElementById('hour').value = '2';
+  document.getElementById('day').value = '*';
+  document.getElementById('month').value = '*';
+  document.getElementById('weekday').value = '*';
+  
+  // 更新预览
+  updateCronPreview();
+}
+
+// 重置为原始值（编辑模式下使用）
+function resetToOriginalCron() {
+  {{if .IsEdit}}
+  initializeFromExistingCron('{{.CronExpr}}');
+  {{else}}
+  clearCronBuilder();
+  {{end}}
+}
+
+function updateCronPreview() {
+  const second = document.getElementById('second').value;
+  const minute = document.getElementById('minute').value;
+  const hour = document.getElementById('hour').value;
+  const day = document.getElementById('day').value;
+  const month = document.getElementById('month').value;
+  const weekday = document.getElementById('weekday').value;
+  
+  const cronExpr = `${second} ${minute} ${hour} ${day} ${month} ${weekday}`;
+  document.getElementById('generatedCron').textContent = cronExpr;
+}
+
+
 </script>
 
-<style>
-/* 任务流表单专用样式 */
-.page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 100vh;
-  padding: 10px 40px 40px;
-  width: 800px !important;
-}
-
-.toolbar {
-  text-align: center;
-  width: 100%;
-}
-
-.form-wrap {
-  width: 100% !important;
-  max-width: 100% !important;
-  padding: 10px !important;
-  background: #fff !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
-  margin-top: 0;
-}
-
-/* 表单内容填满容器 */
-.form-wrap .form,
-.form-wrap .form-group,
-.form-wrap .cron-builder,
-.form-wrap .form-group input,
-.form-wrap .form-group textarea,
-.form-wrap .cron-section select,
-.form-wrap .cron-section input,
-.form-wrap .cron-preview-input {
-  width: 100% !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-}
-
-.cron-builder {
-  background-color: #f9f9f9;
-  margin-top: 10px;
-}
-
-.cron-section {
-  margin-bottom: 15px;
-}
-
-.cron-section label {
-  font-weight: 500;
-  color: #333;
-}
-
-.cron-section select,
-.cron-section input {
-  font-size: 14px;
-}
-
-.cron-section select:focus,
-.cron-section input:focus {
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.cron-options {
-  margin-top: 15px;
-  padding: 15px;
-  background-color: white;
-  border: 1px solid #e0e0e0;
-}
-
-.cron-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.time-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.time-inputs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: center;
-}
-
-.time-inputs input {
-  width: 60px !important;
-  text-align: center;
-  font-size: 14px;
-}
-
-.time-inputs input:focus {
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.time-inputs span {
-  font-weight: bold;
-  color: #666;
-}
-
-.cron-preview {
-  margin-top: 20px;
-  padding: 15px;
-  background-color: #e8f4fd;
-  border: 1px solid #b3d9ff;
-}
-
-.cron-preview label {
-  color: #0066cc;
-}
-
-.cron-preview-input {
-  background: white;
-  border: 1px solid #0066cc;
-  font-family: monospace;
-  font-size: 14px;
-  color: #0066cc;
-  margin-bottom: 8px;
-}
-
-.cron-description {
-  font-size: 13px;
-  color: #1565c0;
-  font-weight: 500;
-  padding: 6px 10px;
-  background: rgba(33, 150, 243, 0.1);
-  border-left: 3px solid #2196f3;
-}
-
-.form-hint {
-  font-size: 12px;
-  color: #666;
-}
-
-.cron-hint {
-  font-size: 12px;
-  color: #666;
-  font-style: italic;
-}
-
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .cron-row {
-    grid-template-columns: 1fr;
-    gap: 15px;
-  }
-  
-  .time-inputs {
-    justify-content: center;
-  }
-}
-</style>
 
 {{template "footer" .}}
 {{end}}

@@ -1,138 +1,149 @@
 {{define "task_log/detail.tmpl"}}
 {{template "header" .}}
+{{template "common/alert.tmpl" .}}
 
-<div style="position: fixed; top: 60px; left: 0; right: 0; bottom: 0; background: white; z-index: 999;">
-    <div class="card" style="margin: 0; border: none; border-radius: 0; height: 100%; display: flex; flex-direction: column;">
-        <div class="card-header d-flex justify-content-between align-items-center" style="padding: 10px 20px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; flex-shrink: 0;">
-            <h3 style="margin: 0;">任务执行详情</h3>
-            <a href="/task-logs" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> 返回列表
-            </a>
-        </div>
-        <div class="card-body p-0" style="flex: 1; overflow: hidden;">
-            <div id="logDetailContent" style="height: 100%; width: 100%;">
-                <div style="text-align: center; padding: 50px;">
-                    <div class="spinner-border" role="status">
-                        <span class="sr-only">加载中...</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+<div>
+  <!-- 页面标题 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+      <i class="bi bi-file-text me-2"></i>任务执行详情
+    </h1>
+    <a href="/task-logs" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>返回列表
+    </a>
+  </div>
+
+  <!-- 任务信息 -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5 class="card-title mb-0">
+        <i class="bi bi-info-circle me-2"></i>任务信息
+      </h5>
     </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-6">
+          <p><strong>任务ID:</strong> {{.Log.TaskID}}</p>
+          <p><strong>任务名称:</strong> {{.Log.TaskName}}</p>
+          <p><strong>状态:</strong> 
+            <span class="badge bg-{{if eq .Log.Status "success"}}success{{else if eq .Log.Status "failed"}}danger{{else if eq .Log.Status "running"}}primary{{else if eq .Log.Status "killed"}}warning{{else if eq .Log.Status "pending"}}secondary{{else if eq .Log.Status "skipped"}}info{{else}}secondary{{end}}">
+              {{if eq .Log.Status "success"}}成功{{else if eq .Log.Status "failed"}}失败{{else if eq .Log.Status "running"}}运行中{{else if eq .Log.Status "killed"}}已终止{{else if eq .Log.Status "pending"}}等待中{{else if eq .Log.Status "skipped"}}跳过{{else}}{{.Log.Status}}{{end}}
+            </span>
+          </p>
+        </div>
+        <div class="col-md-6">
+          <p><strong>开始时间:</strong> {{.Log.StartTime}}</p>
+          <p><strong>结束时间:</strong> {{if .Log.EndTime}}{{.Log.EndTime}}{{else}}-{{end}}</p>
+          <p><strong>持续时间:</strong> {{if .Log.Duration}}{{.Log.Duration}}{{else}}-{{end}}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 执行日志 -->
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="card-title mb-0">
+        <i class="bi bi-terminal me-2"></i>执行日志
+      </h5>
+      <div class="btn-group btn-group-sm">
+        <button type="button" 
+                class="btn btn-outline-secondary" 
+                onclick="copyLogContent()">
+          <i class="bi bi-clipboard me-1"></i>复制
+        </button>
+        <button type="button" 
+                class="btn btn-outline-secondary" 
+                onclick="refreshLog()">
+          <i class="bi bi-arrow-clockwise me-1"></i>刷新
+        </button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div id="logContent" 
+           class="bg-dark text-light p-3" 
+           style="height: 500px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.4;">
+        {{.Log.Content}}
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-// 页面加载时获取日志详情
+let logContent = '';
+
+// 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
-    const logId = getLogIdFromUrl();
-    if (logId) {
-        loadLogDetail(logId);
-    } else {
-        showError('无效的日志ID');
-    }
+  logContent = document.getElementById('logContent').textContent;
+  
+  // 如果是运行中的任务，自动刷新
+  const status = '{{.Log.Status}}';
+  if (status === 'running') {
+    setInterval(refreshLog, 5000); // 每5秒刷新一次
+  }
 });
 
-// 从URL获取日志ID
-function getLogIdFromUrl() {
-    const path = window.location.pathname;
-    const match = path.match(/\/task-logs\/(\d+)/);
-    return match ? match[1] : null;
+function copyLogContent() {
+  if (!logContent) {
+    showAlert('没有可复制的内容', 'warning');
+    return;
+  }
+  
+  navigator.clipboard.writeText(logContent).then(() => {
+    showAlert('已复制到剪贴板', 'success');
+  }).catch(() => {
+    showAlert('复制失败', 'danger');
+  });
 }
 
-// 加载日志详情
-function loadLogDetail(logId) {
-    fetch(`/api/task-logs/${logId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                renderLogDetail(data.data);
-            } else {
-                showError('获取日志详情失败: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showError('获取日志详情失败');
-        });
-}
-
-// 渲染日志详情
-function renderLogDetail(log) {
-    const logContent = log.log_content ? 
-        `<pre style="height: 100%; width: 100%; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.4; margin: 0; padding: 20px; background: #1e1e1e; color: #d4d4d4;">${escapeHtml(log.log_content)}</pre>` : 
-        '<div style="text-align: center; padding: 50px; color: #6c757d;"><p>暂无日志内容</p></div>';
-
-    document.getElementById('logDetailContent').innerHTML = logContent;
-}
-
-// 显示错误信息
-function showError(message) {
-    document.getElementById('logDetailContent').innerHTML = `
-        <div class="alert alert-danger">
-            <i class="fas fa-exclamation-triangle"></i> ${message}
-        </div>
-    `;
-}
-
-// 获取状态样式类
-function getStatusClass(status) {
-    const classes = {
-        'success': 'success',
-        'failed': 'danger',
-        'running': 'warning',
-        'killed': 'secondary',
-        'pending': 'info',
-        'skipped': 'light'
-    };
-    return classes[status] || 'secondary';
-}
-
-// 获取状态文本
-function getStatusText(status) {
-    const texts = {
-        'success': '成功',
-        'failed': '失败',
-        'running': '运行中',
-        'killed': '已终止',
-        'pending': '等待中',
-        'skipped': '跳过'
-    };
-    return texts[status] || '未知';
-}
-
-// 获取执行方式文本
-function getExecutionTypeText(type) {
-    const texts = {
-        'scheduled': '定时执行',
-        'manual': '手动执行'
-    };
-    return texts[type] || '未知';
-}
-
-// 格式化日期时间
-function formatDateTime(dateTimeStr) {
-    if (!dateTimeStr) return '-';
-    const date = new Date(dateTimeStr);
-    // 强制转换为UTC+8时区显示
-    return date.toLocaleString('zh-CN', {
-        timeZone: 'Asia/Shanghai',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
+function refreshLog() {
+  const logId = '{{.Log.ID}}';
+  
+  fetch(`/api/task-logs/${logId}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.content) {
+        logContent = data.content;
+        document.getElementById('logContent').textContent = data.content;
+        
+        // 滚动到底部
+        const logElement = document.getElementById('logContent');
+        logElement.scrollTop = logElement.scrollHeight;
+      }
+    })
+    .catch(error => {
+      console.error('刷新日志失败:', error);
+      showAlert('刷新日志失败', 'danger');
     });
 }
 
 
-// HTML转义
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+// 状态处理函数
+function getStatusBadgeClass(status) {
+  const statusMap = {
+    'success': 'success',
+    'failed': 'danger',
+    'running': 'primary',
+    'killed': 'warning',
+    'pending': 'secondary',
+    'skipped': 'info'
+  };
+  return statusMap[status] || 'secondary';
+}
+
+function getStatusText(status) {
+  const statusMap = {
+    'success': '成功',
+    'failed': '失败',
+    'running': '运行中',
+    'killed': '已终止',
+    'pending': '等待中',
+    'skipped': '跳过'
+  };
+  return statusMap[status] || status;
 }
 </script>
+
 
 {{template "footer" .}}
 {{end}}
