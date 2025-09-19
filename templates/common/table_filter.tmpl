@@ -1,0 +1,148 @@
+{{define "table_filter"}}
+<!-- 通用表格过滤组件 -->
+<div class="row mb-3">
+  <div class="col-md-4">
+    <div class="input-group">
+      <span class="input-group-text">
+        <i class="bi bi-search"></i>
+      </span>
+      <input type="text" 
+             class="form-control" 
+             id="searchInput" 
+             placeholder="搜索...">
+    </div>
+  </div>
+  <div class="col-md-2">
+    <select class="form-select" id="filterSelect">
+      <option value="">全部</option>
+    </select>
+  </div>
+  <div class="col-md-6">
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-secondary" id="resetBtn">
+        <i class="bi bi-arrow-clockwise me-1"></i>重置
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// 通用表格过滤功能
+class TableFilter {
+  constructor(config) {
+    this.config = {
+      tableId: config.tableId || 'dataTable',
+      searchInputId: config.searchInputId || 'searchInput',
+      filterSelectId: config.filterSelectId || 'filterSelect',
+      resetBtnId: config.resetBtnId || 'resetBtn',
+      searchColumns: config.searchColumns || [], // 要搜索的列索引数组
+      filterColumn: config.filterColumn || null, // 要过滤的列索引
+      customFilter: config.customFilter || null, // 自定义过滤函数
+      onFilter: config.onFilter || null, // 过滤后的回调
+      ...config
+    };
+    
+    this.init();
+  }
+  
+  init() {
+    this.searchInput = document.getElementById(this.config.searchInputId);
+    this.filterSelect = document.getElementById(this.config.filterSelectId);
+    this.resetBtn = document.getElementById(this.config.resetBtnId);
+    this.table = document.getElementById(this.config.tableId);
+    
+    if (!this.searchInput || !this.table) {
+      console.error('TableFilter: 必需的DOM元素未找到');
+      return;
+    }
+    
+    // 绑定事件
+    this.searchInput.addEventListener('input', () => this.filter());
+    if (this.filterSelect) {
+      this.filterSelect.addEventListener('change', () => this.filter());
+    }
+    if (this.resetBtn) {
+      this.resetBtn.addEventListener('click', () => this.reset());
+    }
+  }
+  
+  filter() {
+    const searchTerm = this.searchInput.value.toLowerCase();
+    const filterValue = this.filterSelect ? this.filterSelect.value : '';
+    const rows = this.table.querySelectorAll('tbody tr[data-id]');
+    
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+      let showRow = true;
+      
+      // 搜索过滤
+      if (searchTerm && this.config.searchColumns.length > 0) {
+        showRow = this.config.searchColumns.some(colIndex => {
+          const cell = row.cells[colIndex];
+          return cell && cell.textContent.toLowerCase().includes(searchTerm);
+        });
+      }
+      
+      // 选择过滤（当filterColumn不为null时）
+      if (showRow && filterValue && this.config.filterColumn !== null) {
+        const cell = row.cells[this.config.filterColumn];
+        if (cell) {
+          const cellValue = cell.textContent.trim();
+          showRow = cellValue === filterValue;
+        }
+      }
+      
+      // 自定义过滤（当有自定义过滤函数时）
+      if (showRow && this.config.customFilter) {
+        showRow = this.config.customFilter(row, searchTerm, filterValue);
+      }
+      
+      // 显示/隐藏行
+      row.style.display = showRow ? '' : 'none';
+      if (showRow) visibleCount++;
+    });
+    
+    // 更新无数据提示
+    this.updateNoDataMessage(visibleCount);
+    
+    // 回调
+    if (this.config.onFilter) {
+      this.config.onFilter(visibleCount, searchTerm, filterValue);
+    }
+  }
+  
+  reset() {
+    if (this.searchInput) this.searchInput.value = '';
+    if (this.filterSelect) this.filterSelect.value = '';
+    
+    this.filter();
+  }
+  
+  updateNoDataMessage(visibleCount) {
+    let noDataRow = this.table.querySelector('tr.no-data');
+    
+    if (visibleCount === 0) {
+      if (!noDataRow) {
+        noDataRow = document.createElement('tr');
+        noDataRow.className = 'no-data';
+        noDataRow.innerHTML = `
+          <td colspan="${this.table.querySelectorAll('thead th').length}" class="text-center text-muted py-4">
+            <i class="bi bi-search me-2"></i>没有找到匹配的数据
+          </td>
+        `;
+        this.table.querySelector('tbody').appendChild(noDataRow);
+      }
+      noDataRow.style.display = '';
+    } else if (noDataRow) {
+      noDataRow.style.display = 'none';
+    }
+  }
+}
+
+// 便捷函数
+function initTableFilter(config) {
+  return new TableFilter(config);
+}
+</script>
+{{end}}
