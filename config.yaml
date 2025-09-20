@@ -1,21 +1,21 @@
-# DataX Web Go 配置文件
+# DataX Web 配置文件
+server:
+  port: "8000"
+  host: "0.0.0.0"
 
-# 数据库配置
-db:
-  host: 127.0.0.1
-  port: 3306
-  user: root
-  pass: your_pass
-  name: datax_web
+database:
+  host: "127.0.0.1"
+  port: "3306"
+  user: "root"
+  password: "your_pass"
+  name: "datax_web"
 
-# 会话密钥
-session_key: change-me-very-secret
+logging:
+  level: "INFO"
 
-# 服务器端口
-port: 8000
+datax:
+  home: "/opt/datax"
+  temp_dir: "/tmp/datax-web"
 
-# DataX 安装目录
-datax_home: /opt/datax
-
-# 临时文件目录（DataX 作业配置文件存放位置）
-temp_dir: /tmp/datax-web
+session:
+  key: "your-secret-session-key-change-in-production"

@@ -1,26 +1,23 @@
-package controllers
+package handler
 
 import (
-	"database/sql"
-	"net/http"
-
-	"com.duole/datax-web-go/internal/services/datax"
+	"com.duole/datax-web-go/internal/service/datax"
 	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
-// DataXController 处理 DataX 相关的 HTTP 请求
-type DataXController struct {
+// DataXHandler DataX处理器
+type DataXHandler struct {
 	dataxService *datax.Service
 }
 
-// NewDataXController 创建新的 DataX 控制器
-func NewDataXController(db *sql.DB) *DataXController {
-	return &DataXController{
-		dataxService: datax.NewService(db),
-	}
+// NewDataXHandler 创建DataX处理器
+func NewDataXHandler(dataxService *datax.Service) *DataXHandler {
+	return &DataXHandler{dataxService: dataxService}
 }
 
-func (ct *DataXController) DataXConfPreview(c *gin.Context) {
+// ConfigPreview DataX配置预览
+func (h *DataXHandler) ConfigPreview(c *gin.Context) {
 	var req datax.ConfigRequest
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -31,7 +28,7 @@ func (ct *DataXController) DataXConfPreview(c *gin.Context) {
 	}
 
 	// 使用 DataX 配置服务处理请求
-	response := ct.dataxService.GenerateConfig(req)
+	response := h.dataxService.GenerateConfig(req)
 
 	// 根据验证错误返回适当的HTTP状态码
 	if !response.Success {

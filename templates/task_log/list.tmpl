@@ -137,13 +137,6 @@ let currentLogContent = '';
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
   loadTaskLogs();
-  
-  // 绑定搜索事件
-  document.getElementById('statusFilter').addEventListener('change', searchTaskLogs);
-  document.getElementById('executionTypeFilter').addEventListener('change', searchTaskLogs);
-  document.getElementById('taskNameFilter').addEventListener('input', searchTaskLogs);
-  document.getElementById('dateFromFilter').addEventListener('change', searchTaskLogs);
-  document.getElementById('dateToFilter').addEventListener('change', searchTaskLogs);
 });
 
 function loadTaskLogs(page = 1) {
@@ -163,10 +156,20 @@ function loadTaskLogs(page = 1) {
   });
   
   fetch(`/api/task-logs?${params}`)
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        return response.json().then(data => {
+          throw new Error(data.error || `HTTP ${response.status}`);
+        });
+      }
+      return response.json();
+    })
     .then(data => {
       renderTaskLogs(data.logs || []);
-      renderPagination(data.pagination || {});
+      renderPagination({
+        current_page: data.page,
+        total_pages: data.total_pages
+      });
     })
     .catch(error => {
       console.error('加载任务日志失败:', error);
@@ -305,9 +308,16 @@ function refreshTaskLogs() {
 
 function viewLogDetail(logId) {
   fetch(`/api/task-logs/${logId}`)
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        return response.json().then(data => {
+          throw new Error(data.error || `HTTP ${response.status}`);
+        });
+      }
+      return response.json();
+    })
     .then(data => {
-      currentLogContent = data.content || '';
+      currentLogContent = data.content || data.log || '';
       document.getElementById('logDetailContent').innerHTML = `
         <div class="mb-3">
           <h6>任务信息</h6>
@@ -347,14 +357,17 @@ function killTask(logId) {
   fetch(`/api/task-logs/${logId}/kill`, {
     method: 'POST'
   })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        showAlert('任务已终止', 'success');
-        loadTaskLogs(currentPage);
-      } else {
-        showAlert(data.message || '终止任务失败', 'danger');
+    .then(response => {
+      if (!response.ok) {
+        return response.json().then(data => {
+          throw new Error(data.error || data.message || `HTTP ${response.status}`);
+        });
       }
+      return response.json();
+    })
+    .then(data => {
+      showAlert('任务已终止', 'success');
+      loadTaskLogs(currentPage);
     })
     .catch(error => {
       console.error('终止任务失败:', error);

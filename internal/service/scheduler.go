@@ -1,4 +1,4 @@
-package services
+package service
 
 import (
 	"context"
@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"com.duole/datax-web-go/internal/models"
-	"com.duole/datax-web-go/internal/util"
+	"com.duole/datax-web-go/internal/entities"
+	"com.duole/datax-web-go/internal/utils"
 )
 
 // runningTask 表示当前正在执行的 DataX 任务
@@ -260,13 +260,13 @@ func (s *Scheduler) runTask(ctx context.Context, taskID int, executionDate time.
 	// 处理日期占位符
 	var processedConfig string
 	if executionDate.IsZero() {
-		processedConfig = util.ProcessDatePlaceholders(jsonCfg)
+		processedConfig = utils.ProcessDatePlaceholders(jsonCfg)
 	} else {
-		processedConfig = util.ProcessDatePlaceholders(jsonCfg, executionDate)
+		processedConfig = utils.ProcessDatePlaceholders(jsonCfg, executionDate)
 	}
 
 	// 验证并创建路径
-	pathValidator := util.NewPathValidator()
+	pathValidator := utils.NewPathValidator()
 	if err := pathValidator.ValidateDataXConfigPaths(processedConfig); err != nil {
 		cleanup()
 		errorMsg := fmt.Sprintf("路径验证失败: %v", err)
@@ -448,10 +448,10 @@ func (s *Scheduler) executeFlowSteps(ctx context.Context, flowID, execID int, ex
 	}
 	defer rows.Close()
 
-	var steps []models.TaskFlowStep
+	var steps []entities.TaskFlowStep
 
 	for rows.Next() {
-		var step models.TaskFlowStep
+		var step entities.TaskFlowStep
 		var stepOrder int
 		rows.Scan(&step.ID, &step.TaskID, &step.TimeoutMinutes, &stepOrder, &step.TaskName)
 		step.StepOrder = stepOrder
@@ -474,7 +474,7 @@ func (s *Scheduler) executeFlowSteps(ctx context.Context, flowID, execID int, ex
 }
 
 // executeStep 执行单个步骤
-func (s *Scheduler) executeStep(ctx context.Context, step models.TaskFlowStep, flowID, execID int, executionType string) (bool, error) {
+func (s *Scheduler) executeStep(ctx context.Context, step entities.TaskFlowStep, flowID, execID int, executionType string) (bool, error) {
 	// 如果指定了超时时间则创建带超时的上下文
 	stepCtx := ctx
 	var cancel context.CancelFunc

@@ -1,7 +1,7 @@
-package services
+package service
 
 import (
-	"database/sql"
+	"com.duole/datax-web-go/internal/database"
 	"errors"
 	"github.com/gorilla/sessions"
 	"golang.org/x/crypto/bcrypt"
@@ -14,20 +14,19 @@ import (
 // 已认证用户信息。数据库中的所有密码必须存储为 bcrypt 哈希。
 // 在成功认证期间，会话会使用已登录用户和角色进行更新。
 type AuthService struct {
-	db    *sql.DB
 	store *sessions.CookieStore
 }
 
-// NewAuthService 使用给定的数据库句柄和 cookie 存储创建新的 AuthService。
+// NewAuthService 使用给定的 cookie 存储创建新的 AuthService。
 // 在将其传递给此构造函数之前，应该使用安全选项配置存储。
-func NewAuthService(db *sql.DB, store *sessions.CookieStore) *AuthService {
+func NewAuthService(store *sessions.CookieStore) *AuthService {
 	// 为内部使用配置会话选项
 	store.Options = &sessions.Options{
 		Path:     "/",
 		MaxAge:   86400 * 7, // 7 days for internal use
 		HttpOnly: true,
 	}
-	return &AuthService{db: db, store: store}
+	return &AuthService{store: store}
 }
 
 // Login 尝试认证给定的用户名和密码。如果成功，
@@ -35,20 +34,18 @@ func NewAuthService(db *sql.DB, store *sessions.CookieStore) *AuthService {
 // 已认证的角色或失败时的错误。调用者负责
 // 通过 sess.Save() 持久化会话。
 func (a *AuthService) Login(w http.ResponseWriter, r *http.Request, username, password string) (string, error) {
-	var hash, role string
-	var disabled bool
-	err := a.db.QueryRow("SELECT password, role, disabled FROM users WHERE username=?", username).Scan(&hash, &role, &disabled)
+	user, err := database.GetDB().User.GetByUsername(username)
 	if err != nil {
 		return "", errors.New("invalid credentials")
 	}
 
 	// 检查账户是否被禁用
-	if disabled {
+	if user.Disabled {
 		return "", errors.New("account is disabled")
 	}
 
 	// 比较 bcrypt 哈希密码
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) != nil {
 		return "", errors.New("invalid credentials")
 	}
 
@@ -60,14 +57,14 @@ func (a *AuthService) Login(w http.ResponseWriter, r *http.Request, username, pa
 	}
 
 	sess.Values["user"] = username
-	sess.Values["role"] = role
+	sess.Values["role"] = user.Role
 
 	if err := sess.Save(r, w); err != nil {
 		log.Printf("Error saving session: %v", err)
 		return "", errors.New("session error")
 	}
 
-	return role, nil
+	return user.Role, nil
 }
 
 // Logout 清除当前会话，有效登出用户。

@@ -2,68 +2,129 @@
 {{template "header" .}}
 {{template "common/alert.tmpl" .}}
 
-<div>
+<div class="container-fluid">
   <!-- 页面标题 -->
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0">
-      <i class="bi bi-file-text me-2"></i>任务执行详情
-    </h1>
+    <div>
+      <h1 class="h3 mb-1">
+        <i class="bi bi-file-text me-2"></i>任务执行详情
+      </h1>
+      <p class="text-muted mb-0">日志ID: {{.Log.ID}}</p>
+    </div>
     <a href="/task-logs" class="btn btn-outline-secondary">
       <i class="bi bi-arrow-left me-1"></i>返回列表
     </a>
   </div>
 
-  <!-- 任务信息 -->
-  <div class="card mb-4">
-    <div class="card-header">
-      <h5 class="card-title mb-0">
-        <i class="bi bi-info-circle me-2"></i>任务信息
-      </h5>
+  <!-- 任务信息卡片 -->
+  <div class="row mb-4">
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-info-circle me-2 text-primary"></i>任务信息
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="d-flex align-items-center mb-3">
+                <i class="bi bi-hash text-muted me-2"></i>
+                <div>
+                  <small class="text-muted d-block">任务ID</small>
+                  <span class="fw-semibold">{{.Log.TaskID}}</span>
+                </div>
+              </div>
+              <div class="d-flex align-items-center mb-3">
+                <i class="bi bi-file-earmark-text text-muted me-2"></i>
+                <div>
+                  <small class="text-muted d-block">任务名称</small>
+                  <span class="fw-semibold">{{.Log.TaskName}}</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="d-flex align-items-center mb-3">
+                <i class="bi bi-clock text-muted me-2"></i>
+                <div>
+                  <small class="text-muted d-block">开始时间</small>
+                  <span class="fw-semibold">{{.Log.StartTime}}</span>
+                </div>
+              </div>
+              <div class="d-flex align-items-center mb-3">
+                <i class="bi bi-clock-history text-muted me-2"></i>
+                <div>
+                  <small class="text-muted d-block">结束时间</small>
+                  <span class="fw-semibold">{{if .Log.EndTime}}{{.Log.EndTime}}{{else}}-{{end}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="card-body">
-      <div class="row">
-        <div class="col-md-6">
-          <p><strong>任务ID:</strong> {{.Log.TaskID}}</p>
-          <p><strong>任务名称:</strong> {{.Log.TaskName}}</p>
-          <p><strong>状态:</strong> 
-            <span class="badge bg-{{if eq .Log.Status "success"}}success{{else if eq .Log.Status "failed"}}danger{{else if eq .Log.Status "running"}}primary{{else if eq .Log.Status "killed"}}warning{{else if eq .Log.Status "pending"}}secondary{{else if eq .Log.Status "skipped"}}info{{else}}secondary{{end}}">
+    
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-activity me-2 text-primary"></i>执行状态
+          </h5>
+        </div>
+        <div class="card-body text-center">
+          <div class="mb-3">
+            <span class="badge bg-{{if eq .Log.Status "success"}}success{{else if eq .Log.Status "failed"}}danger{{else if eq .Log.Status "running"}}primary{{else if eq .Log.Status "killed"}}warning{{else if eq .Log.Status "pending"}}secondary{{else if eq .Log.Status "skipped"}}info{{else}}secondary{{end}} fs-6 px-3 py-2">
               {{if eq .Log.Status "success"}}成功{{else if eq .Log.Status "failed"}}失败{{else if eq .Log.Status "running"}}运行中{{else if eq .Log.Status "killed"}}已终止{{else if eq .Log.Status "pending"}}等待中{{else if eq .Log.Status "skipped"}}跳过{{else}}{{.Log.Status}}{{end}}
             </span>
-          </p>
-        </div>
-        <div class="col-md-6">
-          <p><strong>开始时间:</strong> {{.Log.StartTime}}</p>
-          <p><strong>结束时间:</strong> {{if .Log.EndTime}}{{.Log.EndTime}}{{else}}-{{end}}</p>
-          <p><strong>持续时间:</strong> {{if .Log.Duration}}{{.Log.Duration}}{{else}}-{{end}}</p>
+          </div>
+          <div class="mb-2">
+            <small class="text-muted d-block">持续时间</small>
+            <span class="fw-semibold fs-5">{{if .Log.Duration}}{{.Log.Duration}}{{else}}-{{end}}</span>
+          </div>
+          <div class="mb-2">
+            <small class="text-muted d-block">执行方式</small>
+            <span class="badge bg-{{if eq .Log.ExecutionType "manual"}}primary{{else}}info{{end}}">
+              {{if eq .Log.ExecutionType "manual"}}手动执行{{else}}调度执行{{end}}
+            </span>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <!-- 执行日志 -->
-  <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
       <h5 class="card-title mb-0">
-        <i class="bi bi-terminal me-2"></i>执行日志
+        <i class="bi bi-terminal me-2 text-primary"></i>执行日志
       </h5>
       <div class="btn-group btn-group-sm">
         <button type="button" 
-                class="btn btn-outline-secondary" 
-                onclick="copyLogContent()">
+                class="btn btn-outline-primary" 
+                onclick="copyLogContent()"
+                title="复制日志内容">
           <i class="bi bi-clipboard me-1"></i>复制
         </button>
         <button type="button" 
                 class="btn btn-outline-secondary" 
-                onclick="refreshLog()">
+                onclick="refreshLog()"
+                title="刷新日志内容">
           <i class="bi bi-arrow-clockwise me-1"></i>刷新
+        </button>
+        <button type="button" 
+                class="btn btn-outline-secondary" 
+                onclick="toggleAutoScroll()"
+                id="autoScrollBtn"
+                title="切换自动滚动">
+          <i class="bi bi-arrow-down-circle me-1"></i>自动滚动
         </button>
       </div>
     </div>
     <div class="card-body p-0">
       <div id="logContent" 
            class="bg-dark text-light p-3" 
-           style="height: 500px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.4;">
-        {{.Log.Content}}
+           style="height: 600px; overflow-y: auto; font-family: 'Fira Code', 'Courier New', monospace; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;">
+        {{.Log.LogContent}}
       </div>
     </div>
   </div>
@@ -71,6 +132,8 @@
 
 <script>
 let logContent = '';
+let autoScroll = true;
+let refreshInterval = null;
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -79,8 +142,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // 如果是运行中的任务，自动刷新
   const status = '{{.Log.Status}}';
   if (status === 'running') {
-    setInterval(refreshLog, 5000); // 每5秒刷新一次
+    startAutoRefresh();
   }
+  
+  // 初始滚动到底部
+  scrollToBottom();
 });
 
 function copyLogContent() {
@@ -100,15 +166,24 @@ function refreshLog() {
   const logId = '{{.Log.ID}}';
   
   fetch(`/api/task-logs/${logId}`)
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        return response.json().then(data => {
+          throw new Error(data.error || `HTTP ${response.status}`);
+        });
+      }
+      return response.json();
+    })
     .then(data => {
-      if (data.content) {
-        logContent = data.content;
-        document.getElementById('logContent').textContent = data.content;
+      const newContent = data.log || data.content || '';
+      if (newContent !== logContent) {
+        logContent = newContent;
+        document.getElementById('logContent').textContent = logContent;
         
-        // 滚动到底部
-        const logElement = document.getElementById('logContent');
-        logElement.scrollTop = logElement.scrollHeight;
+        // 如果启用自动滚动，滚动到底部
+        if (autoScroll) {
+          scrollToBottom();
+        }
       }
     })
     .catch(error => {
@@ -117,6 +192,54 @@ function refreshLog() {
     });
 }
 
+function startAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+  refreshInterval = setInterval(refreshLog, 3000); // 每3秒刷新一次
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+}
+
+function toggleAutoScroll() {
+  autoScroll = !autoScroll;
+  const btn = document.getElementById('autoScrollBtn');
+  
+  if (autoScroll) {
+    btn.innerHTML = '<i class="bi bi-arrow-down-circle-fill me-1"></i>自动滚动';
+    btn.classList.remove('btn-outline-secondary');
+    btn.classList.add('btn-primary');
+    scrollToBottom();
+  } else {
+    btn.innerHTML = '<i class="bi bi-arrow-down-circle me-1"></i>自动滚动';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-outline-secondary');
+  }
+}
+
+function scrollToBottom() {
+  const logElement = document.getElementById('logContent');
+  logElement.scrollTop = logElement.scrollHeight;
+}
+
+// 监听滚动事件，如果用户手动滚动，则禁用自动滚动
+document.getElementById('logContent').addEventListener('scroll', function() {
+  const logElement = this;
+  const isAtBottom = logElement.scrollTop + logElement.clientHeight >= logElement.scrollHeight - 10;
+  
+  if (!isAtBottom && autoScroll) {
+    autoScroll = false;
+    const btn = document.getElementById('autoScrollBtn');
+    btn.innerHTML = '<i class="bi bi-arrow-down-circle me-1"></i>自动滚动';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-outline-secondary');
+  }
+});
 
 // 状态处理函数
 function getStatusBadgeClass(status) {
