@@ -3,7 +3,10 @@ package handler
 import (
 	"com.duole/datax-web-go/internal/database"
 	"com.duole/datax-web-go/internal/entities"
+	"com.duole/datax-web-go/internal/service"
+	"context"
 	"github.com/gin-gonic/gin"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -60,6 +63,10 @@ func (h *TaskFlowHandler) Create(c *gin.Context) {
 	if err != nil {
 		c.String(http.StatusInternalServerError, "创建任务流失败: "+err.Error())
 		return
+	}
+
+	if err := service.Get().Scheduler.ReloadTaskFlow(taskFlow.ID); err != nil {
+		log.Printf("taskflow: failed to schedule new flow %d: %v", taskFlow.ID, err)
 	}
 
 	c.Redirect(http.StatusFound, "/task-flows")
@@ -126,6 +133,10 @@ func (h *TaskFlowHandler) Update(c *gin.Context) {
 		return
 	}
 
+	if err := service.Get().Scheduler.ReloadTaskFlow(taskFlow.ID); err != nil {
+		log.Printf("taskflow: failed to reload flow %d: %v", taskFlow.ID, err)
+	}
+
 	c.Redirect(http.StatusFound, "/task-flows")
 }
 
@@ -135,6 +146,10 @@ func (h *TaskFlowHandler) Delete(c *gin.Context) {
 	if err != nil {
 		c.String(http.StatusBadRequest, "无效的任务流ID")
 		return
+	}
+
+	if err := service.Get().Scheduler.RemoveTaskFlowFromCron(id); err != nil {
+		log.Printf("taskflow: failed to remove flow %d from scheduler: %v", id, err)
 	}
 
 	err = database.GetDB().TaskFlow.Delete(id)
@@ -173,6 +188,10 @@ func (h *TaskFlowHandler) Toggle(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "切换任务流状态失败: " + err.Error()})
 		return
+	}
+
+	if err := service.Get().Scheduler.ReloadTaskFlow(taskFlow.ID); err != nil {
+		log.Printf("taskflow: failed to reload flow %d after toggle: %v", taskFlow.ID, err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "任务流状态更新成功"})
@@ -272,15 +291,15 @@ func (h *TaskFlowHandler) ReorderSteps(c *gin.Context) {
 	}
 
 	// 解析步骤顺序
-	stepOrders := make([]int, 0)
-	for key, values := range c.Request.PostForm {
-		if key == "step_orders[]" {
-			for _, value := range values {
-				if stepID, err := strconv.Atoi(value); err == nil {
-					stepOrders = append(stepOrders, stepID)
-				}
-			}
+	orderValues := c.PostFormArray("step_orders[]")
+	stepOrders := make([]int, 0, len(orderValues))
+	for _, value := range orderValues {
+		stepID, convErr := strconv.Atoi(value)
+		if convErr != nil {
+			c.String(http.StatusBadRequest, "无效的步骤顺序")
+			return
 		}
+		stepOrders = append(stepOrders, stepID)
 	}
 
 	if len(stepOrders) == 0 {
@@ -300,26 +319,34 @@ func (h *TaskFlowHandler) ReorderSteps(c *gin.Context) {
 
 // RunNow 立即执行任务流
 func (h *TaskFlowHandler) RunNow(c *gin.Context) {
-	_, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.String(http.StatusBadRequest, "无效的任务流ID")
 		return
 	}
 
-	// 这里应该调用调度器执行任务流
-	// 暂时返回成功，实际实现需要调用scheduler
-	c.String(http.StatusOK, "任务流已提交执行")
+	svc := service.Get().Scheduler
+	go func(flowID int) {
+		if runErr := svc.RunTaskFlow(context.Background(), flowID); runErr != nil {
+			log.Printf("taskflow: run flow %d failed: %v", flowID, runErr)
+		}
+	}(id)
+
+	c.JSON(http.StatusOK, gin.H{"message": "任务流已提交执行"})
 }
 
 // Kill 终止任务流执行
 func (h *TaskFlowHandler) Kill(c *gin.Context) {
-	_, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.String(http.StatusBadRequest, "无效的任务流ID")
 		return
 	}
 
-	// 这里应该调用调度器终止任务流
-	// 暂时返回成功，实际实现需要调用scheduler
-	c.String(http.StatusOK, "任务流已终止")
+	if err := service.Get().Scheduler.KillTaskFlow(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "任务流已终止"})
 }

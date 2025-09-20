@@ -156,29 +156,62 @@ func (h *DataSourceHandler) Delete(c *gin.Context) {
 
 // TestConnection 测试数据源连接
 func (h *DataSourceHandler) TestConnection(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.String(http.StatusBadRequest, "无效的数据源ID")
+	var req struct {
+		ID         *int   `json:"id"`
+		Type       string `json:"type"`
+		DBURL      string `json:"db_url"`
+		DBUser     string `json:"db_user"`
+		DBPassword string `json:"db_password"`
+		DBDatabase string `json:"db_database"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "请求参数无效"})
 		return
 	}
 
-	ds, err := database.GetDB().DataSource.GetByID(id)
-	if err != nil {
-		c.String(http.StatusNotFound, "数据源不存在")
-		return
-	}
+	var (
+		url          string
+		user         string
+		password     string
+		databaseName string
+	)
 
-	// 只测试MySQL连接
-	if ds.IsMySQL() && ds.DBURL != nil && ds.DBUser != nil && ds.DBPassword != nil && ds.DBDatabase != nil {
-		err = testConnection(*ds.DBURL, *ds.DBUser, *ds.DBPassword, *ds.DBDatabase)
+	if req.ID != nil && *req.ID > 0 {
+		ds, err := database.GetDB().DataSource.GetByID(*req.ID)
 		if err != nil {
-			c.String(http.StatusInternalServerError, "连接测试失败: "+err.Error())
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "数据源不存在"})
 			return
 		}
-		c.String(http.StatusOK, "连接测试成功")
+		if !ds.IsMySQL() || ds.DBURL == nil || ds.DBUser == nil || ds.DBDatabase == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "只支持MySQL数据源连接测试"})
+			return
+		}
+
+		url = strings.TrimSpace(*ds.DBURL)
+		user = strings.TrimSpace(*ds.DBUser)
+		databaseName = strings.TrimSpace(*ds.DBDatabase)
+		if ds.DBPassword != nil {
+			password = *ds.DBPassword
+		}
 	} else {
-		c.String(http.StatusBadRequest, "只支持MySQL数据源连接测试")
+		url = strings.TrimSpace(req.DBURL)
+		user = strings.TrimSpace(req.DBUser)
+		password = req.DBPassword
+		databaseName = strings.TrimSpace(req.DBDatabase)
+
+		if url == "" || user == "" || databaseName == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "请填写完整的数据库连接信息"})
+			return
+		}
 	}
+
+	if err := testConnection(url, user, password, databaseName); err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 // GetOneJSON 获取单个数据源的JSON信息

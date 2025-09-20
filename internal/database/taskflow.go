@@ -70,10 +70,10 @@ func (d *TaskFlowDB) ListEnabled() ([]entities.TaskFlow, error) {
 
 // GetByID 根据ID获取任务流
 func (d *TaskFlowDB) GetByID(id int) (*entities.TaskFlow, error) {
-	query := `SELECT id,name,cron_expr,enabled FROM task_flows WHERE id=?`
+	query := `SELECT id,name,description,cron_expr,enabled,created_at,updated_at FROM task_flows WHERE id=?`
 
 	var flow entities.TaskFlow
-	err := db.QueryRow(query, id).Scan(&flow.ID, &flow.Name, &flow.CronExpr, &flow.Enabled)
+	err := db.QueryRow(query, id).Scan(&flow.ID, &flow.Name, &flow.Description, &flow.CronExpr, &flow.Enabled, &flow.CreatedAt, &flow.UpdatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -87,11 +87,15 @@ func (d *TaskFlowDB) GetByID(id int) (*entities.TaskFlow, error) {
 
 // Create 创建任务流
 func (d *TaskFlowDB) Create(flow *entities.TaskFlow) error {
-	query := `INSERT INTO task_flows(name,cron_expr,enabled,created_by,updated_by) VALUES(?,?,?,?,?)`
+	query := `INSERT INTO task_flows(name,description,cron_expr,enabled,created_by,updated_by) VALUES(?,?,?,?,?,?)`
 
-	_, err := db.Exec(query, flow.Name, flow.CronExpr, flow.Enabled, flow.CreatedBy, flow.UpdatedBy)
+	result, err := db.Exec(query, flow.Name, flow.Description, flow.CronExpr, flow.Enabled, flow.CreatedBy, flow.UpdatedBy)
 	if err != nil {
 		return fmt.Errorf("创建任务流失败: %w", err)
+	}
+
+	if flowID, err := result.LastInsertId(); err == nil {
+		flow.ID = int(flowID)
 	}
 
 	return nil
@@ -99,9 +103,9 @@ func (d *TaskFlowDB) Create(flow *entities.TaskFlow) error {
 
 // Update 更新任务流
 func (d *TaskFlowDB) Update(flow *entities.TaskFlow) error {
-	query := `UPDATE task_flows SET name=?,cron_expr=?,enabled=?,updated_by=? WHERE id=?`
+	query := `UPDATE task_flows SET name=?,description=?,cron_expr=?,enabled=?,updated_by=? WHERE id=?`
 
-	result, err := db.Exec(query, flow.Name, flow.CronExpr, flow.Enabled, flow.UpdatedBy, flow.ID)
+	result, err := db.Exec(query, flow.Name, flow.Description, flow.CronExpr, flow.Enabled, flow.UpdatedBy, flow.ID)
 	if err != nil {
 		return fmt.Errorf("更新任务流失败: %w", err)
 	}

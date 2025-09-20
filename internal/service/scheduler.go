@@ -453,9 +453,15 @@ func (s *Scheduler) executeFlowSteps(ctx context.Context, flowID, execID int, ex
 	for rows.Next() {
 		var step entities.TaskFlowStep
 		var stepOrder int
-		rows.Scan(&step.ID, &step.TaskID, &step.TimeoutMinutes, &stepOrder, &step.TaskName)
+		if err := rows.Scan(&step.ID, &step.TaskID, &step.TimeoutMinutes, &stepOrder, &step.TaskName); err != nil {
+			return fmt.Errorf("failed to scan task flow step: %w", err)
+		}
 		step.StepOrder = stepOrder
 		steps = append(steps, step)
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate task flow steps: %w", err)
 	}
 
 	// 按顺序执行所有步骤

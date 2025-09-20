@@ -116,16 +116,12 @@ func setupRouter(db *sql.DB) *gin.Engine {
 	flowLogs := r.Group("/flow-logs", h.Auth.MustLogin())
 	{
 		flowLogs.GET("", h.Log.FlowLogList)
-		flowLogs.GET("/api", h.Log.GetFlowLogs)
-		flowLogs.GET("/api/:id", h.Log.GetFlowLogDetail)
 	}
 
 	taskLogs := r.Group("/task-logs", h.Auth.MustLogin())
 	{
 		taskLogs.GET("", h.Log.TaskLogList)
 		taskLogs.GET("/:id", h.Log.GetTaskLogDetail)
-		taskLogs.GET("/api", h.Log.GetTaskLogs)
-		taskLogs.GET("/api/:id", h.Log.GetTaskLogDetail)
 	}
 
 	// API路由
@@ -133,6 +129,12 @@ func setupRouter(db *sql.DB) *gin.Engine {
 	{
 		api.GET("/meta/mysql/:id/columns/:table", h.Meta.Columns)
 		api.POST("/datax/preview", h.DataX.ConfigPreview)
+		api.GET("/task-logs", h.Log.GetTaskLogs)
+		api.GET("/task-logs/:id", h.Log.GetTaskLogDetail)
+		api.POST("/task-logs/:id/kill", h.Log.KillTaskByLog)
+		api.GET("/flow-logs", h.Log.GetFlowLogs)
+		api.GET("/flow-logs/:id", h.Log.GetFlowLogDetail)
+		api.POST("/flow-logs/:id/kill", h.Log.KillFlowByLog)
 	}
 
 	// 工具页面
