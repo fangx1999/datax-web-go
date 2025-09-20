@@ -247,5 +247,5 @@ func (h *TaskHandler) RunNow(c *gin.Context) {
 		}
 	}()
 
-	c.String(http.StatusOK, "任务已提交执行")
+	c.JSON(http.StatusOK, gin.H{"message": "任务已提交执行"})
 }

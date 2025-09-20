@@ -40,20 +40,20 @@ type TaskExecutionLog struct {
 
 // FlowLogListResponse 表示流程日志列表响应
 type FlowLogListResponse struct {
-	Logs      []FlowExecutionLog `json:"logs"`
-	Total     int                `json:"total"`
-	Page      int                `json:"page"`
-	PageSize  int                `json:"page_size"`
-	TotalPage int                `json:"total_page"`
+	Logs       []FlowExecutionLog `json:"logs"`
+	Total      int                `json:"total"`
+	Page       int                `json:"page"`
+	PageSize   int                `json:"page_size"`
+	TotalPages int                `json:"total_pages"`
 }
 
 // TaskLogListResponse 表示任务日志列表响应
 type TaskLogListResponse struct {
-	Logs      []TaskExecutionLog `json:"logs"`
-	Total     int                `json:"total"`
-	Page      int                `json:"page"`
-	PageSize  int                `json:"page_size"`
-	TotalPage int                `json:"total_page"`
+	Logs       []TaskExecutionLog `json:"logs"`
+	Total      int                `json:"total"`
+	Page       int                `json:"page"`
+	PageSize   int                `json:"page_size"`
+	TotalPages int                `json:"total_pages"`
 }
 
 // FlowLogDetailResponse 表示流程日志详情响应

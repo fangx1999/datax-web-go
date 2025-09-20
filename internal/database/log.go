@@ -2,188 +2,502 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"com.duole/datax-web-go/internal/entities"
 )
+
+// 统一的日志错误定义，方便调用方通过 errors.Is 判断
+var (
+	ErrTaskLogNotFound = errors.New("任务日志不存在")
+	ErrFlowLogNotFound = errors.New("流程日志不存在")
+)
+
+// TaskLogFilters 用于构建任务日志查询条件
+type TaskLogFilters struct {
+	Status        string
+	ExecutionType string
+	TaskName      string
+	DateFrom      *time.Time
+	DateTo        *time.Time
+}
+
+// FlowLogFilters 用于构建任务流日志查询条件
+type FlowLogFilters struct {
+	Status        string
+	ExecutionType string
+	FlowName      string
+	DateFrom      *time.Time
+	DateTo        *time.Time
+}
 
 // LogDB 日志数据库操作（空结构体）
 type LogDB struct{}
 
 // GetTaskLogs 获取任务日志列表
-func (d *LogDB) GetTaskLogs(page, pageSize int, taskID, status string) (*entities.TaskLogListResponse, error) {
-	// 构建查询条件
-	whereClause := "1=1"
-	args := []interface{}{}
-
-	if taskID != "" {
-		whereClause += " AND task_id = ?"
-		args = append(args, taskID)
+func (d *LogDB) GetTaskLogs(page, pageSize int, filters TaskLogFilters) (*entities.TaskLogListResponse, error) {
+	if page <= 0 {
+		page = 1
 	}
-	if status != "" {
-		whereClause += " AND status = ?"
-		args = append(args, status)
+	if pageSize <= 0 {
+		pageSize = 20
 	}
 
-	// 查询总数
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM task_execution_logs WHERE %s", whereClause)
+	conditions := []string{"1=1"}
+	args := make([]interface{}, 0)
+
+	if filters.Status != "" {
+		conditions = append(conditions, "tl.status = ?")
+		args = append(args, filters.Status)
+	}
+	if filters.ExecutionType != "" {
+		conditions = append(conditions, "tl.execution_type = ?")
+		args = append(args, filters.ExecutionType)
+	}
+	if filters.TaskName != "" {
+		conditions = append(conditions, "t.name LIKE ?")
+		args = append(args, "%"+filters.TaskName+"%")
+	}
+	if filters.DateFrom != nil {
+		conditions = append(conditions, "tl.start_time >= ?")
+		args = append(args, filters.DateFrom.UTC())
+	}
+	if filters.DateTo != nil {
+		conditions = append(conditions, "tl.start_time <= ?")
+		args = append(args, filters.DateTo.UTC())
+	}
+
+	whereClause := strings.Join(conditions, " AND ")
+
+	countQuery := fmt.Sprintf(`
+                SELECT COUNT(*)
+                FROM task_logs tl
+                LEFT JOIN tasks t ON tl.task_id = t.id
+                WHERE %s
+        `, whereClause)
+
 	var total int
-	err := db.QueryRow(countQuery, args...).Scan(&total)
-	if err != nil {
+	if err := db.QueryRow(countQuery, args...).Scan(&total); err != nil {
 		return nil, fmt.Errorf("查询任务日志总数失败: %w", err)
 	}
 
-	// 查询数据
-	query := fmt.Sprintf(`
-		SELECT tel.id, tel.task_id, t.name as task_name, tel.status, tel.start_time, tel.end_time, tel.message
-		FROM task_execution_logs tel
-		LEFT JOIN tasks t ON tel.task_id = t.id
-		WHERE %s
-		ORDER BY tel.start_time DESC
-		LIMIT ? OFFSET ?
-	`, whereClause)
-
 	offset := (page - 1) * pageSize
-	args = append(args, pageSize, offset)
+	queryArgs := append(append([]interface{}{}, args...), pageSize, offset)
 
-	rows, err := db.Query(query, args...)
+	query := fmt.Sprintf(`
+                SELECT
+                        tl.id,
+                        tl.task_id,
+                        COALESCE(t.name, ''),
+                        tl.flow_execution_id,
+                        tl.step_id,
+                        tl.step_order,
+                        tl.status,
+                        tl.execution_type,
+                        tl.start_time,
+                        tl.end_time,
+                        tl.log,
+                        tl.created_at
+                FROM task_logs tl
+                LEFT JOIN tasks t ON tl.task_id = t.id
+                WHERE %s
+                ORDER BY tl.start_time DESC
+                LIMIT ? OFFSET ?
+        `, whereClause)
+
+	rows, err := db.Query(query, queryArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("查询任务日志失败: %w", err)
 	}
 	defer rows.Close()
 
-	var logs []entities.TaskExecutionLog
+	logs := make([]entities.TaskExecutionLog, 0)
 	for rows.Next() {
-		var log entities.TaskExecutionLog
-		err := rows.Scan(
-			&log.ID, &log.TaskID, &log.TaskName, &log.Status,
-			&log.StartTime, &log.EndTime, &log.Message)
-		if err != nil {
+		var (
+			logEntry   entities.TaskExecutionLog
+			flowExecID sql.NullInt64
+			stepID     sql.NullInt64
+			stepOrder  sql.NullInt64
+			endTime    sql.NullTime
+			logContent string
+			createdAt  time.Time
+		)
+
+		if err := rows.Scan(
+			&logEntry.ID,
+			&logEntry.TaskID,
+			&logEntry.TaskName,
+			&flowExecID,
+			&stepID,
+			&stepOrder,
+			&logEntry.Status,
+			&logEntry.ExecutionType,
+			&logEntry.StartTime,
+			&endTime,
+			&logContent,
+			&createdAt,
+		); err != nil {
 			return nil, fmt.Errorf("扫描任务日志数据失败: %w", err)
 		}
-		logs = append(logs, log)
+
+		if flowExecID.Valid {
+			v := int(flowExecID.Int64)
+			logEntry.FlowExecutionID = &v
+		}
+		if stepID.Valid {
+			v := int(stepID.Int64)
+			logEntry.StepID = &v
+		}
+		if stepOrder.Valid {
+			v := int(stepOrder.Int64)
+			logEntry.StepOrder = &v
+		}
+		if endTime.Valid {
+			end := endTime.Time
+			logEntry.EndTime = &end
+			logEntry.Duration = formatDuration(logEntry.StartTime, &end)
+		} else {
+			logEntry.Duration = ""
+		}
+
+		logEntry.Message = truncateLog(logContent)
+		logEntry.LogContent = logContent
+		logEntry.CreatedAt = createdAt
+
+		logs = append(logs, logEntry)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("遍历任务日志失败: %w", err)
 	}
 
 	return &entities.TaskLogListResponse{
-		Logs:      logs,
-		Total:     total,
-		Page:      page,
-		PageSize:  pageSize,
-		TotalPage: (total + pageSize - 1) / pageSize,
+		Logs:       logs,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: calcTotalPages(total, pageSize),
 	}, nil
 }
 
 // GetFlowLogs 获取流程日志列表
-func (d *LogDB) GetFlowLogs(page, pageSize int, flowID, status string) (*entities.FlowLogListResponse, error) {
-	// 构建查询条件
-	whereClause := "1=1"
-	args := []interface{}{}
-
-	if flowID != "" {
-		whereClause += " AND flow_id = ?"
-		args = append(args, flowID)
+func (d *LogDB) GetFlowLogs(page, pageSize int, filters FlowLogFilters) (*entities.FlowLogListResponse, error) {
+	if page <= 0 {
+		page = 1
 	}
-	if status != "" {
-		whereClause += " AND status = ?"
-		args = append(args, status)
+	if pageSize <= 0 {
+		pageSize = 20
 	}
 
-	// 查询总数
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM flow_execution_logs WHERE %s", whereClause)
+	conditions := []string{"1=1"}
+	args := make([]interface{}, 0)
+
+	if filters.Status != "" {
+		conditions = append(conditions, "tfe.status = ?")
+		args = append(args, filters.Status)
+	}
+	if filters.ExecutionType != "" {
+		conditions = append(conditions, "tfe.execution_type = ?")
+		args = append(args, filters.ExecutionType)
+	}
+	if filters.FlowName != "" {
+		conditions = append(conditions, "tf.name LIKE ?")
+		args = append(args, "%"+filters.FlowName+"%")
+	}
+	if filters.DateFrom != nil {
+		conditions = append(conditions, "tfe.start_time >= ?")
+		args = append(args, filters.DateFrom.UTC())
+	}
+	if filters.DateTo != nil {
+		conditions = append(conditions, "tfe.start_time <= ?")
+		args = append(args, filters.DateTo.UTC())
+	}
+
+	whereClause := strings.Join(conditions, " AND ")
+
+	countQuery := fmt.Sprintf(`
+                SELECT COUNT(*)
+                FROM task_flow_executions tfe
+                LEFT JOIN task_flows tf ON tfe.flow_id = tf.id
+                WHERE %s
+        `, whereClause)
+
 	var total int
-	err := db.QueryRow(countQuery, args...).Scan(&total)
-	if err != nil {
-		return nil, fmt.Errorf("查询流程日志总数失败: %w", err)
+	if err := db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+		return nil, fmt.Errorf("查询任务流日志总数失败: %w", err)
 	}
-
-	// 查询数据
-	query := fmt.Sprintf(`
-		SELECT fel.id, fel.flow_id, tf.name as flow_name, fel.status, fel.start_time, fel.end_time, fel.message
-		FROM flow_execution_logs fel
-		LEFT JOIN task_flows tf ON fel.flow_id = tf.id
-		WHERE %s
-		ORDER BY fel.start_time DESC
-		LIMIT ? OFFSET ?
-	`, whereClause)
 
 	offset := (page - 1) * pageSize
-	args = append(args, pageSize, offset)
+	queryArgs := append(append([]interface{}{}, args...), pageSize, offset)
 
-	rows, err := db.Query(query, args...)
+	query := fmt.Sprintf(`
+                SELECT
+                        tfe.id,
+                        tfe.flow_id,
+                        COALESCE(tf.name, ''),
+                        tfe.status,
+                        tfe.execution_type,
+                        tfe.start_time,
+                        tfe.end_time,
+                        tfe.created_at
+                FROM task_flow_executions tfe
+                LEFT JOIN task_flows tf ON tfe.flow_id = tf.id
+                WHERE %s
+                ORDER BY tfe.start_time DESC
+                LIMIT ? OFFSET ?
+        `, whereClause)
+
+	rows, err := db.Query(query, queryArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("查询流程日志失败: %w", err)
+		return nil, fmt.Errorf("查询任务流日志失败: %w", err)
 	}
 	defer rows.Close()
 
-	var logs []entities.FlowExecutionLog
+	logs := make([]entities.FlowExecutionLog, 0)
 	for rows.Next() {
-		var log entities.FlowExecutionLog
-		err := rows.Scan(
-			&log.ID, &log.FlowID, &log.FlowName, &log.Status,
-			&log.StartTime, &log.EndTime, &log.Message)
-		if err != nil {
-			return nil, fmt.Errorf("扫描流程日志数据失败: %w", err)
+		var (
+			logEntry  entities.FlowExecutionLog
+			endTime   sql.NullTime
+			createdAt time.Time
+		)
+
+		if err := rows.Scan(
+			&logEntry.ID,
+			&logEntry.FlowID,
+			&logEntry.FlowName,
+			&logEntry.Status,
+			&logEntry.ExecutionType,
+			&logEntry.StartTime,
+			&endTime,
+			&createdAt,
+		); err != nil {
+			return nil, fmt.Errorf("扫描任务流日志失败: %w", err)
 		}
-		logs = append(logs, log)
+
+		if endTime.Valid {
+			end := endTime.Time
+			logEntry.EndTime = &end
+			logEntry.Duration = formatDuration(logEntry.StartTime, &end)
+		}
+
+		logEntry.CreatedAt = createdAt
+		logs = append(logs, logEntry)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("遍历任务流日志失败: %w", err)
 	}
 
 	return &entities.FlowLogListResponse{
-		Logs:      logs,
-		Total:     total,
-		Page:      page,
-		PageSize:  pageSize,
-		TotalPage: (total + pageSize - 1) / pageSize,
+		Logs:       logs,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: calcTotalPages(total, pageSize),
 	}, nil
 }
 
 // GetTaskLogDetail 获取任务日志详情
 func (d *LogDB) GetTaskLogDetail(id int) (*entities.TaskExecutionLog, error) {
 	query := `
-		SELECT tel.id, tel.task_id, t.name as task_name, tel.status, 
-		       tel.start_time, tel.end_time, tel.message, tel.log_content
-		FROM task_execution_logs tel
-		LEFT JOIN tasks t ON tel.task_id = t.id
-		WHERE tel.id = ?
-	`
+                SELECT
+                        tl.id,
+                        tl.task_id,
+                        COALESCE(t.name, ''),
+                        tl.flow_execution_id,
+                        tl.step_id,
+                        tl.step_order,
+                        tl.status,
+                        tl.execution_type,
+                        tl.start_time,
+                        tl.end_time,
+                        tl.log,
+                        tl.created_at
+                FROM task_logs tl
+                LEFT JOIN tasks t ON tl.task_id = t.id
+                WHERE tl.id = ?
+        `
 
-	var log entities.TaskExecutionLog
+	var (
+		logEntry   entities.TaskExecutionLog
+		flowExecID sql.NullInt64
+		stepID     sql.NullInt64
+		stepOrder  sql.NullInt64
+		endTime    sql.NullTime
+		content    string
+		createdAt  time.Time
+	)
+
 	err := db.QueryRow(query, id).Scan(
-		&log.ID, &log.TaskID, &log.TaskName, &log.Status,
-		&log.StartTime, &log.EndTime, &log.Message, &log.LogContent)
-
+		&logEntry.ID,
+		&logEntry.TaskID,
+		&logEntry.TaskName,
+		&flowExecID,
+		&stepID,
+		&stepOrder,
+		&logEntry.Status,
+		&logEntry.ExecutionType,
+		&logEntry.StartTime,
+		&endTime,
+		&content,
+		&createdAt,
+	)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("任务日志不存在")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTaskLogNotFound
 		}
 		return nil, fmt.Errorf("查询任务日志详情失败: %w", err)
 	}
 
-	return &log, nil
+	if flowExecID.Valid {
+		v := int(flowExecID.Int64)
+		logEntry.FlowExecutionID = &v
+	}
+	if stepID.Valid {
+		v := int(stepID.Int64)
+		logEntry.StepID = &v
+	}
+	if stepOrder.Valid {
+		v := int(stepOrder.Int64)
+		logEntry.StepOrder = &v
+	}
+	if endTime.Valid {
+		end := endTime.Time
+		logEntry.EndTime = &end
+		logEntry.Duration = formatDuration(logEntry.StartTime, &end)
+	}
+
+	logEntry.LogContent = content
+	logEntry.Message = truncateLog(content)
+	logEntry.CreatedAt = createdAt
+
+	return &logEntry, nil
 }
 
 // GetFlowLogDetail 获取流程日志详情
 func (d *LogDB) GetFlowLogDetail(id int) (*entities.FlowLogDetailResponse, error) {
 	query := `
-		SELECT fel.id, fel.flow_id, tf.name as flow_name, fel.status,
-		       fel.start_time, fel.end_time, fel.message, fel.log_content
-		FROM flow_execution_logs fel
-		LEFT JOIN task_flows tf ON fel.flow_id = tf.id
-		WHERE fel.id = ?
-	`
+                SELECT
+                        tfe.id,
+                        tfe.flow_id,
+                        COALESCE(tf.name, ''),
+                        tfe.status,
+                        tfe.execution_type,
+                        tfe.start_time,
+                        tfe.end_time,
+                        tfe.created_at
+                FROM task_flow_executions tfe
+                LEFT JOIN task_flows tf ON tfe.flow_id = tf.id
+                WHERE tfe.id = ?
+        `
 
-	var log entities.FlowExecutionLog
+	var (
+		logEntry  entities.FlowExecutionLog
+		endTime   sql.NullTime
+		createdAt time.Time
+	)
+
 	err := db.QueryRow(query, id).Scan(
-		&log.ID, &log.FlowID, &log.FlowName, &log.Status,
-		&log.StartTime, &log.EndTime, &log.Message, &log.LogContent)
-
+		&logEntry.ID,
+		&logEntry.FlowID,
+		&logEntry.FlowName,
+		&logEntry.Status,
+		&logEntry.ExecutionType,
+		&logEntry.StartTime,
+		&endTime,
+		&createdAt,
+	)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("流程日志不存在")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrFlowLogNotFound
 		}
 		return nil, fmt.Errorf("查询流程日志详情失败: %w", err)
 	}
 
-	return &entities.FlowLogDetailResponse{
-		Log: log,
-	}, nil
+	if endTime.Valid {
+		end := endTime.Time
+		logEntry.EndTime = &end
+		logEntry.Duration = formatDuration(logEntry.StartTime, &end)
+	}
+	logEntry.CreatedAt = createdAt
+
+	// 汇总子任务日志内容
+	builder := &strings.Builder{}
+	rows, err := db.Query(`
+                SELECT COALESCE(t.name, ''), tl.status, tl.start_time, tl.end_time, tl.log
+                FROM task_logs tl
+                LEFT JOIN tasks t ON tl.task_id = t.id
+                WHERE tl.flow_execution_id = ?
+                ORDER BY tl.start_time
+        `, id)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var (
+				taskName sql.NullString
+				status   string
+				start    time.Time
+				end      sql.NullTime
+				content  string
+			)
+
+			if scanErr := rows.Scan(&taskName, &status, &start, &end, &content); scanErr != nil {
+				err = fmt.Errorf("扫描子任务日志失败: %w", scanErr)
+				break
+			}
+
+			fmt.Fprintf(builder, "任务: %s\n", taskName.String)
+			fmt.Fprintf(builder, "状态: %s\n", status)
+			fmt.Fprintf(builder, "开始时间: %s\n", start.Format(time.RFC3339))
+			if end.Valid {
+				fmt.Fprintf(builder, "结束时间: %s\n", end.Time.Format(time.RFC3339))
+			}
+			builder.WriteString("日志内容:\n")
+			builder.WriteString(content)
+			builder.WriteString("\n\n")
+		}
+
+		if err == nil {
+			if rowsErr := rows.Err(); rowsErr != nil {
+				err = fmt.Errorf("遍历子任务日志失败: %w", rowsErr)
+			}
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	logEntry.LogContent = builder.String()
+
+	return &entities.FlowLogDetailResponse{Log: logEntry}, nil
+}
+
+func truncateLog(content string) string {
+	const maxLen = 200
+	if len(content) <= maxLen {
+		return content
+	}
+	return content[:maxLen] + "..."
+}
+
+func formatDuration(start time.Time, end *time.Time) string {
+	if end == nil {
+		return ""
+	}
+	duration := end.Sub(start)
+	if duration < 0 {
+		duration = 0
+	}
+	return duration.Truncate(time.Second).String()
+}
+
+func calcTotalPages(total, pageSize int) int {
+	if pageSize <= 0 {
+		return 0
+	}
+	return (total + pageSize - 1) / pageSize
 }
